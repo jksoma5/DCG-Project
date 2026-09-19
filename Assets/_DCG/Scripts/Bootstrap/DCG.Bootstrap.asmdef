@@ -5,7 +5,8 @@
     "DCG.Core",
     "DCG.Gameplay",
     "DCG.Classes",
-    "DCG.Presentation"
+    "DCG.Presentation",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "autoReferenced": true

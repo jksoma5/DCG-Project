@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using DCG.Core;
 using DCG.Gameplay;
 using DCG.Gameplay.Navigation;
@@ -126,6 +127,15 @@ namespace DCG.Tests
         {
             yield return LoadScene("Assets/_DCG/Scenes/ControlLab.unity");
             yield return null;
+            // Real mice must be removed first, not just disabled. "Point" binds <Mouse>/position, so
+            // while the editor's physical mouse is still a device the action reads its desktop position
+            // (observed: 3569, -709 on a multi-monitor desktop) instead of the synthetic device's, and the
+            // click lands outside the overlay. That made this test pass in batch mode (-nographics, no real
+            // mouse) and fail in an interactive editor. DisableDevice is not enough; the value still wins.
+            var removed = new List<Mouse>();
+            foreach (var device in InputSystem.devices)
+                if (device is Mouse existing) removed.Add(existing);
+            foreach (var existing in removed) InputSystem.RemoveDevice(existing);
             var mouse = InputSystem.AddDevice<Mouse>();
             var oldMode = InputSystem.settings.updateMode;
             var oldBackground = InputSystem.settings.backgroundBehavior;
@@ -155,6 +165,7 @@ namespace DCG.Tests
             finally
             {
                 InputSystem.RemoveDevice(mouse);
+                foreach (var existing in removed) InputSystem.AddDevice(existing);
                 InputSystem.settings.updateMode = oldMode;
                 InputSystem.settings.backgroundBehavior = oldBackground;
                 InputSystem.settings.editorInputBehaviorInPlayMode = oldEditorBehavior;

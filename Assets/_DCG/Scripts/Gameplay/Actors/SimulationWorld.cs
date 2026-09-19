@@ -24,6 +24,17 @@ namespace DCG.Gameplay
             actors.Sort((a, b) => a.Id.Value.CompareTo(b.Id.Value));
             actor.Initialize(this);
         }
+        // The hub spawns and despawns a module's actors on every class switch, so registration has to be
+        // reversible. Without this the list keeps destroyed entries and an id can never be reused.
+        public void Unregister(ActorSimulation actor)
+        {
+            actors.Remove(actor);
+            actors.RemoveAll(a => a == null);
+        }
+        public void UnregisterAll()
+        {
+            actors.Clear();
+        }
         public ActorSimulation Find(ActorId id) => actors.Find(a => a != null && a.Id == id);
         void FixedUpdate() { if (AutomaticTicks) Step(Time.fixedDeltaTime); }
         public void Step(float deltaTime)

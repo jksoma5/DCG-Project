@@ -13,10 +13,10 @@ namespace DCG.Tests
     public sealed class PaulTests
     {
         PaulLabController lab;FighterMatch match;FighterAgent a,b;uint sequence;
-        InputSettings.UpdateMode originalMode;
+        InputSettings.UpdateMode originalMode;float originalFixedDelta;
         [UnitySetUp] public IEnumerator Setup()
         {
-            originalMode=InputSystem.settings.updateMode;
+            originalMode=InputSystem.settings.updateMode;originalFixedDelta=Time.fixedDeltaTime;
             yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode("Assets/_DCG/Scenes/PaulLab.unity",new LoadSceneParameters(LoadSceneMode.Single));
             yield return null;
             lab=Object.FindFirstObjectByType<PaulLabController>();lab.automatic=false;lab.input.enabled=false;
@@ -172,7 +172,7 @@ namespace DCG.Tests
         [Test] public void MacrosDoNotBecomeSinglePunchAndInputSettingsRestore()
         {
             Tick(5,FightButtons.LP|FightButtons.RP);Run(2);Assert.That(a.State.Move.moveId,Is.EqualTo("BothHands"));
-            Assert.That(InputSystem.settings.updateMode,Is.EqualTo(originalMode));Assert.That(Time.fixedDeltaTime,Is.EqualTo(.02f).Within(.00001f));
+            Assert.That(InputSystem.settings.updateMode,Is.EqualTo(originalMode));Assert.That(Time.fixedDeltaTime,Is.EqualTo(originalFixedDelta).Within(.00001f));
         }
         [Test] public void FollowupOnlyStartsInsideItsInputWindow()
         {
