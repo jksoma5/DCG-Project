@@ -25,6 +25,8 @@ if ($Regenerate) {
     Invoke-DcgUnity 'rifle-setup' '-quit -executeMethod DCG.Editor.RifleLabSetup.Generate'
     Invoke-DcgUnity 'sniper-setup' '-quit -executeMethod DCG.Editor.SniperLabSetup.Generate'
     Invoke-DcgUnity 'paul-setup' '-quit -executeMethod DCG.Editor.PaulLabSetup.Generate'
+    # The hub is generated last: it loads the prefabs, tuning and materials the lab generators create.
+    Invoke-DcgUnity 'hub-setup' '-quit -executeMethod DCG.Editor.ControlHubSetup.Generate'
 }
 foreach ($mode in @('EditMode', 'PlayMode')) {
     $report = Join-Path $logPath ("dcg-" + $mode.ToLowerInvariant() + ".xml")

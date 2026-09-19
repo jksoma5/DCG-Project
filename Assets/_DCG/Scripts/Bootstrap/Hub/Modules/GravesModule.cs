@@ -17,25 +17,40 @@ namespace DCG.Bootstrap.Hub
         public GridGraph grid;
         public Material playerMaterial, targetMaterial, lineMaterial;
 
+        // Practice targets belong to the module, not to the map (doc 14, section 4): the unified map is
+        // shared, so whoever is playing creates its own set and takes it away on the way out.
+        // The offsets are the ControlLab layout measured from the player, kept so the same detours,
+        // path replacements and attack orders are reproducible here.
+        public Vector3 movingTargetOffset = new Vector3(18, 0, 11);
+        public Vector3[] staticTargetOffsets = { new Vector3(1, 0, 7), new Vector3(11, 0, 5) };
+        public Vector3 patrolNearOffset = new Vector3(16, 0, 11);
+        public Vector3 patrolFarOffset = new Vector3(21, 0, 11);
+        public float patrolInterval = 2.5f;
+
         public override ClassId Id => ClassId.Graves;
         public override string DisplayName => "GRAVES  /  top-down orders";
         public override string Summary => "RMB move or attack target, A + LMB attack move, S stop";
         // The only class that points at the world with a visible cursor.
         public override HubCursorMode RequiredCursor => HubCursorMode.Free;
 
-        ActorSimulation player;
+        ActorSimulation player, movingTarget;
         GravesInputReader input;
         DebugOverlay overlay;
         TopDownRig rig;
         LineRenderer pathLine, rangeIndicator, clickMarker;
         Material indicatorMaterial, markerMaterial;
+        bool patrol, patrolSide;
+        float nextPatrolOrder;
+        uint patrolSequence;
         const int CircleSegments = 64;
 
         protected override void OnActivate()
         {
-            player = SpawnActor(Context.PlayerSpawn.position, 0, playerMaterial);
-            foreach (var spawn in Context.TargetSpawns)
-                if (spawn != null) SpawnActor(spawn.position, 1, targetMaterial);
+            Vector3 origin = Context.Map.gravesSpawn.position;
+            player = SpawnActor(origin, 0, playerMaterial);
+            movingTarget = SpawnActor(origin + movingTargetOffset, 1, targetMaterial);
+            foreach (var offset in staticTargetOffsets) SpawnActor(origin + offset, 1, targetMaterial);
+            patrol = false; patrolSide = false; nextPatrolOrder = 0;
 
             var host = Context.Camera.gameObject;
             Context.Camera.fieldOfView = tuning.cameraFov;
@@ -56,10 +71,8 @@ namespace DCG.Bootstrap.Hub
             input.WorldClicked += MarkWorldClick;
             overlay.OrderDetails = OrderDetails;
             overlay.ResetRequested = ResetState;
-            // The hub owns the moving-target patrol in stage 2; stage 1 keeps the button inert
-            // rather than pretending it does something.
-            overlay.PatrolRequested = null;
-            overlay.PatrolActive = () => false;
+            overlay.PatrolRequested = TogglePatrol;
+            overlay.PatrolActive = () => patrol;
 
             pathLine = Track(NewLine("Graves active path", .055f, lineMaterial)).GetComponent<LineRenderer>();
             pathLine.positionCount = 0;
@@ -77,7 +90,8 @@ namespace DCG.Bootstrap.Hub
             }
             if (indicatorMaterial != null) Destroy(indicatorMaterial);
             if (markerMaterial != null) Destroy(markerMaterial);
-            player = null; input = null; overlay = null; rig = null;
+            patrol = false;
+            player = null; movingTarget = null; input = null; overlay = null; rig = null;
             pathLine = null; rangeIndicator = null; clickMarker = null;
         }
 
@@ -111,9 +125,42 @@ namespace DCG.Bootstrap.Hub
                 (input.AttackMoveArmed ? "  [A ready]" : "");
         }
 
+        // Ported from LabController. The moving target is ordered back and forth so a path replacement
+        // against a live, moving actor can be seen; the hub owns it now instead of the lab scene.
+        public bool PatrolRunning => patrol;
+        public ActorSimulation MovingTarget => movingTarget;
+
+        public void TogglePatrol()
+        {
+            patrol = !patrol;
+            nextPatrolOrder = 0;
+            if (!patrol && movingTarget != null && movingTarget.Health.IsAlive)
+                SendTarget(CommandType.Stop, Vector3.zero);
+        }
+
+        void SendTarget(CommandType type, Vector3 point)
+        {
+            Context.World.Session.Submit(movingTarget.Id, new PlayerCommand {
+                Envelope = new CommandEnvelope { ActorId = movingTarget.Id, Sequence = ++patrolSequence,
+                    ClientTick = Context.World.Tick, CommandType = type },
+                Move = new MoveToCommand { Destination = point }
+            });
+        }
+
+        void UpdatePatrol()
+        {
+            if (!patrol || movingTarget == null || !movingTarget.Health.IsAlive) return;
+            if (Time.time < nextPatrolOrder) return;
+            patrolSide = !patrolSide;
+            Vector3 origin = Context.Map.gravesSpawn.position;
+            SendTarget(CommandType.MoveTo, origin + (patrolSide ? patrolNearOffset : patrolFarOffset));
+            nextPatrolOrder = Time.time + patrolInterval;
+        }
+
         public override void UpdateView(float deltaTime)
         {
             if (player == null || !player.Initialized) return;
+            UpdatePatrol();
             bool armed = input.AttackMoveArmed && player.Health.IsAlive;
             rangeIndicator.enabled = armed;
             if (armed) SetCircle(rangeIndicator, player.transform.position, tuning.attackRange, .08f);

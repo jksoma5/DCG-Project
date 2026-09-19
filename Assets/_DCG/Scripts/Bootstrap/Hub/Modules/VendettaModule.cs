@@ -15,6 +15,13 @@ namespace DCG.Bootstrap.Hub
         public PrototypeTuning common;
         public Material playerMaterial, targetMaterial, bladeMaterial;
 
+        // The module owns its practice targets (doc 14, section 4). The first two offsets are the
+        // VendettaLab spin and side targets measured from the player, so the spin radius and the dash
+        // hit read the same here. The third stands on the shared high ground, which replaces the lab's
+        // private flight platform as the sword-throw destination.
+        public Vector3[] targetOffsets = { new Vector3(0, 0, 8), new Vector3(-2, 0, 9) };
+        public Vector3 highGroundTargetOffset = new Vector3(0, 0, 1.5f);
+
         public override ClassId Id => ClassId.Vendetta;
         public override string DisplayName => "VENDETTA  /  dash and sword throw";
         public override string Summary => "WASD move, Space jump, Shift dash into spin, E throw and fly";
@@ -30,12 +37,13 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            player = SpawnActor(Context.PlayerSpawn.position, 0, playerMaterial);
+            Vector3 spawn = Context.Map.vendettaSpawn.position;
+            player = SpawnActor(spawn, 0, playerMaterial);
             controller = player.GetComponent<VendettaController>();
             if (controller == null) controller = player.gameObject.AddComponent<VendettaController>();
             controller.tuning = tuning;
-            foreach (var spawn in Context.TargetSpawns)
-                if (spawn != null) SpawnActor(spawn.position, 1, targetMaterial);
+            foreach (var offset in targetOffsets) SpawnActor(spawn + offset, 1, targetMaterial);
+            SpawnActor(Context.Map.highGround.position + highGroundTargetOffset, 1, targetMaterial);
 
             heldSword = FindSword(player.transform);
             if (heldSword != null) { swordLocal = heldSword.localPosition; swordRotation = heldSword.localRotation; }

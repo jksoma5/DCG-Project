@@ -13,13 +13,15 @@ namespace DCG.Bootstrap.Hub
         public SimulationWorld world;
         public UnityEngine.InputSystem.InputActionAsset controls;
         public Camera hubCamera;
-        public Transform playerSpawn;
-        public Transform[] targetSpawns = new Transform[0];
+        public HubMapAnchors map = new HubMapAnchors();
         public ControlModuleBase[] modules = new ControlModuleBase[0];
         public ClassSelectScreen selectScreen;
         public HubHud hud;
 
         public IControlModule ActiveModule { get; private set; }
+        // The cursor mode the hub last applied. Cursor.lockState itself cannot be read back in a
+        // batch-mode run with no window, so the declared-and-applied mode is recorded here.
+        public HubCursorMode CursorMode { get; private set; }
         public bool Selecting => ActiveModule == null;
         public IReadOnlyList<ControlModuleBase> Modules => modules;
 
@@ -32,8 +34,10 @@ namespace DCG.Bootstrap.Hub
         {
             context = new HubContext {
                 World = world, Camera = hubCamera, CameraTransform = hubCamera.transform, Hub = this,
-                PlayerSpawn = playerSpawn, TargetSpawns = targetSpawns
+                Map = map
             };
+            if (!map.Complete)
+                Debug.LogError("Control hub map anchors are incomplete. Run DCG/Generate Control Hub.", this);
         }
 
         void Start() { ShowSelect(); }
@@ -71,6 +75,7 @@ namespace DCG.Bootstrap.Hub
 
         void ApplyCursor(HubCursorMode mode)
         {
+            CursorMode = mode;
             bool locked = mode == HubCursorMode.Locked;
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;

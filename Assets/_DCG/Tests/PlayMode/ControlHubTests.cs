@@ -15,6 +15,8 @@ namespace DCG.Tests
 {
     // Stage 1 completion conditions from doc 14: switching between two classes in one scene must leave
     // exactly one input reader, one camera and one HUD alive, and must not leak actors.
+    // Stage 2 adds the unified map: the anchors a module builds on, a nav grid that covers the plaza
+    // and stops at the lane, and target sets that belong to the module rather than to the scene.
     public sealed class ControlHubTests
     {
         ControlHubController hub;
@@ -50,7 +52,7 @@ namespace DCG.Tests
             Assert.That(Count<VendettaInputReader>(), Is.Zero);
             Assert.That(Count<DebugOverlay>(), Is.EqualTo(1));
             Assert.That(hub.world.AutomaticTicks, Is.True);
-            Assert.That(Cursor.lockState, Is.EqualTo(CursorLockMode.None), "Graves points with a free cursor.");
+            Assert.That(hub.CursorMode, Is.EqualTo(HubCursorMode.Free), "Graves points with a free cursor.");
             int actors = hub.world.Actors.Count;
             Assert.That(actors, Is.GreaterThan(1), "Graves needs a player and at least one target.");
 
@@ -60,7 +62,7 @@ namespace DCG.Tests
             Assert.That(Count<GravesInputReader>(), Is.Zero, "The previous class must release its input reader.");
             Assert.That(Count<VendettaInputReader>(), Is.EqualTo(1));
             Assert.That(Count<DebugOverlay>(), Is.Zero, "Only the active class may draw its HUD.");
-            Assert.That(Cursor.lockState, Is.EqualTo(CursorLockMode.Locked));
+            Assert.That(hub.CursorMode, Is.EqualTo(HubCursorMode.Locked));
             Assert.That(hub.world.Actors.Count, Is.EqualTo(actors));
         }
 
@@ -112,6 +114,88 @@ namespace DCG.Tests
             Assert.That(Count<ActorSimulation>(), Is.Zero, "Leaving a class must remove its actors.");
             Assert.That(Count<VendettaInputReader>(), Is.Zero);
             Assert.That(hub.world.AutomaticTicks, Is.False);
+        }
+
+        [UnityTest] public IEnumerator UnifiedMapExposesEveryAnchor()
+        {
+            var map = hub.map;
+            Assert.That(map.Complete, Is.True, "A module builds on the anchors; none may be missing.");
+            // Paul's stage lies on the map's east-west axis so screen right is always east (doc 12, 1-1).
+            Assert.That(map.fightWest.position.z, Is.EqualTo(map.fightEast.position.z).Within(.001f));
+            Assert.That(map.fightWest.position.x, Is.LessThan(map.fightEast.position.x));
+            // The long lane runs north-south, across the fighting axis rather than along it.
+            Assert.That(map.laneEnd.position.z, Is.GreaterThan(map.laneStart.position.z + 20));
+            Assert.That(map.laneEnd.position.x, Is.EqualTo(map.laneStart.position.x).Within(.001f));
+            // High ground is raised and sits opposite the lane.
+            Assert.That(map.highGround.position.y, Is.GreaterThan(1));
+            Assert.That(map.highGround.position.z, Is.LessThan(map.plazaCenter.position.z));
+            yield return null;
+        }
+
+        [UnityTest] public IEnumerator NavGridCoversThePlazaAndStopsAtTheLane()
+        {
+            var graves = Object.FindFirstObjectByType<GravesModule>();
+            Assert.That(graves.grid, Is.Not.Null);
+            Assert.That(graves.grid.IsBaked, Is.True, "The hub grid must be baked by the generator.");
+            Assert.That(graves.grid.Index(hub.map.plazaCenter.position), Is.Not.EqualTo(-1));
+            Assert.That(graves.grid.Index(hub.map.gravesSpawn.position), Is.Not.EqualTo(-1),
+                "Graves must spawn inside the grid.");
+            Assert.That(graves.grid.Index(hub.map.laneEnd.position), Is.EqualTo(-1),
+                "The lane is deliberately outside the grid; its boundary is drawn on the floor.");
+            yield return null;
+        }
+
+        [UnityTest] public IEnumerator ModulesBringTheirOwnTargetsAndTakeThemAway()
+        {
+            // The shared map holds no targets, so the count before any class is chosen is zero.
+            Assert.That(Count<ActorSimulation>(), Is.Zero);
+
+            hub.Select(ClassId.Graves);
+            yield return null;
+            int gravesTargets = TeamCount(1);
+            Assert.That(gravesTargets, Is.GreaterThan(1), "Graves practises against a moving and static targets.");
+
+            hub.Select(ClassId.Vendetta);
+            yield return null;
+            Assert.That(TeamCount(1), Is.GreaterThan(1));
+            // Vendetta's sword-throw destination is the shared high ground, so one target stands on it.
+            bool onHighGround = false;
+            foreach (var actor in hub.world.Actors)
+                if (actor.team == 1 && actor.transform.position.y > hub.map.highGround.position.y - .5f)
+                    onHighGround = true;
+            Assert.That(onHighGround, Is.True, "Vendetta needs a target on the high ground to fly to.");
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(Count<ActorSimulation>(), Is.Zero, "Leaving a class must take its target set with it.");
+        }
+
+        [UnityTest] public IEnumerator GravesPatrolMovesItsOwnTarget()
+        {
+            hub.Select(ClassId.Graves);
+            yield return null;
+            var graves = (GravesModule)hub.ActiveModule;
+            Assert.That(graves.MovingTarget, Is.Not.Null);
+            Assert.That(graves.PatrolRunning, Is.False, "A class starts with the patrol off.");
+
+            Vector3 start = graves.MovingTarget.transform.position;
+            graves.TogglePatrol();
+            Assert.That(graves.PatrolRunning, Is.True);
+            // Wait on fixed steps, not rendered frames: a batch run with no graphics renders frames far
+            // faster than real time, so 120 rendered frames advance the simulation by about two ticks.
+            for (int step = 0; step < 180; step++) yield return new WaitForFixedUpdate();
+            Assert.That((graves.MovingTarget.transform.position - start).magnitude, Is.GreaterThan(.5f),
+                "The patrol must actually order the moving target somewhere.");
+
+            graves.TogglePatrol();
+            Assert.That(graves.PatrolRunning, Is.False);
+        }
+
+        int TeamCount(int team)
+        {
+            int count = 0;
+            foreach (var actor in hub.world.Actors) if (actor.team == team) count++;
+            return count;
         }
 
         [UnityTest] public IEnumerator ResetRebuildsTheActiveClassWithoutReloadingTheScene()
