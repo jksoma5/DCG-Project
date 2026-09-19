@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c67aa7befb67874fb23be065964894b, type: 3}
+  m_Name: Paul_LP_RP
+  m_EditorClassIdentifier: DCG.Gameplay::DCG.Gameplay.Fighting.MoveData
+  moveId: LP_RP
+  command: 1,2
+  referenceStatus: 0
+  priority: 50
+  startup: 8
+  active: 2
+  recovery: 16
+  level: 0
+  damage: 10
+  range: 2
+  onHit: 5
+  onBlock: -5
+  onCounter: 8
+  hitOutcome:
+    reaction: 0
+    advantageFrames: 5
+    stunFrames: 0
+    launchHeight: 0
+    horizontalSpeed: 0
+    pushback: 0
+    knockdown: 0
+    headTowardAttacker: 0
+    turnDefender: 0
+    juggleCost: 1
+  counterOutcome:
+    reaction: 0
+    advantageFrames: 8
+    stunFrames: 0
+    launchHeight: 0
+    horizontalSpeed: 0
+    pushback: 0
+    knockdown: 0
+    headTowardAttacker: 0
+    turnDefender: 0
+    juggleCost: 1
+  airborneOutcome:
+    reaction: 2
+    advantageFrames: 3
+    stunFrames: 0
+    launchHeight: 0.8
+    horizontalSpeed: 0.6
+    pushback: 0
+    knockdown: 0
+    headTowardAttacker: 0
+    turnDefender: 0
+    juggleCost: 1
+  groundOutcome:
+    reaction: 0
+    advantageFrames: 3
+    stunFrames: 0
+    launchHeight: 1.8
+    horizontalSpeed: 0.7
+    pushback: 0
+    knockdown: 0
+    headTowardAttacker: 0
+    turnDefender: 0
+    juggleCost: 1
+  crouchingOutcome:
+    reaction: 0
+    advantageFrames: 3
+    stunFrames: 0
+    launchHeight: 1.8
+    horizontalSpeed: 0.7
+    pushback: 0
+    knockdown: 0
+    headTowardAttacker: 0
+    turnDefender: 0
+    juggleCost: 1
+  blockOutcome:
+    advantageFrames: -5
+    pushback: 0
+    guardBreak: 0
+    forceCrouch: 0
+  hasCounterOutcome: 1
+  hasAirborneOutcome: 1
+  hasGroundOutcome: 0
+  hasCrouchingOutcome: 0
+  homing: 0
+  counterDamageBonus: 0
+  highCrush:
+    enabled: 0
+    firstFrame: 0
+    lastFrame: 0
+  lowCrush:
+    enabled: 0
+    firstFrame: 0
+    lastFrame: 0
+  powerCrush:
+    enabled: 0
+    firstFrame: 0
+    lastFrame: 0
+  chainStart: 6
+  chainEnd: 18
+  follows: LP

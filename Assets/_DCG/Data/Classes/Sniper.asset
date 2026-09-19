@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85b1a680816c1184fa57d9a03acf2807, type: 3}
+  m_Name: Sniper
+  m_EditorClassIdentifier: DCG.Gameplay::DCG.Gameplay.ClassDefinition
+  classId: 3
+  referenceGame: Sudden Attack TRG / first-person movement / 1 sniper, 2 pistol,
+    3 knife
+  referenceStatus: 0
+  playableInLab: 1
+  actorPrefab: {fileID: 7525516578371493559, guid: 7165b6721a9a7b94a88cbe50070699b9, type: 3}
+  prototypeTuning: {fileID: 11400000, guid: 2dfb89076b26855448412abeeea3acc7, type: 2}
+  pendingNotes: Independent SniperLab. Pistol and knife are generic prototypes. Movement,
+    timing and damage need comparison.

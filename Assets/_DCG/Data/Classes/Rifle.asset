@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85b1a680816c1184fa57d9a03acf2807, type: 3}
+  m_Name: Rifle
+  m_EditorClassIdentifier: DCG.Gameplay::DCG.Gameplay.ClassDefinition
+  classId: 2
+  referenceGame: PUBG M416 / PC shoulder aim + ADS
+  referenceStatus: 0
+  playableInLab: 1
+  actorPrefab: {fileID: 5070134676729239427, guid: 8b25cbc8ef6d9b04191f5dd4db265e7a, type: 3}
+  prototypeTuning: {fileID: 11400000, guid: acb11b2faccce7f408835a9d9d835ce1, type: 2}
+  pendingNotes: Separate RifleLab. Prototype gunplay, movement, stance and aim. Balance
+    and animation not verified against PUBG.

@@ -1,0 +1,16 @@
+{
+  "name": "DCG.Editor",
+  "rootNamespace": "DCG.Editor",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay",
+    "DCG.Classes",
+    "DCG.Presentation",
+    "DCG.Bootstrap",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

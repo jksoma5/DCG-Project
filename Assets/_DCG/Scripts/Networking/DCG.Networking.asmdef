@@ -1,0 +1,10 @@
+{
+  "name": "DCG.Networking",
+  "rootNamespace": "DCG.Networking",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

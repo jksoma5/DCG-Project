@@ -1,0 +1,12 @@
+{
+  "name": "DCG.Bootstrap",
+  "rootNamespace": "DCG.Bootstrap",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay",
+    "DCG.Classes",
+    "DCG.Presentation"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85b1a680816c1184fa57d9a03acf2807, type: 3}
+  m_Name: Paul
+  m_EditorClassIdentifier: DCG.Gameplay::DCG.Gameplay.ClassDefinition
+  classId: 4
+  referenceGame: Tekken 7 Paul / prototype input and frame system
+  referenceStatus: 0
+  playableInLab: 1
+  actorPrefab: {fileID: 2150068286692283681, guid: c52ff742464821d4fb20bf48d9d700a2, type: 3}
+  prototypeTuning: {fileID: 11400000, guid: 8f5c2d13dde91054cbb26b8c9a86a6c5, type: 2}
+  pendingNotes: 'Prototype reactions: launch, air hits, knockdown. Pending original
+    tuning, Sway, throws and Rage.'

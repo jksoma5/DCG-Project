@@ -1,0 +1,11 @@
+{
+  "name": "DCG.Classes",
+  "rootNamespace": "DCG.Classes",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

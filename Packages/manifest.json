@@ -34,6 +34,10 @@
     "com.unity.modules.vehicles": "1.0.0",
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0"
+    "com.unity.modules.xr": "1.0.0",
+    "com.unity.inputsystem": "1.19.0",
+    "com.unity.render-pipelines.universal": "17.5.0",
+    "com.unity.ai.navigation": "2.0.14",
+    "com.unity.test-framework": "1.7.0"
   }
 }

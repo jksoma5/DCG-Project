@@ -1,0 +1,16 @@
+{
+  "name": "DCG.Tests.PlayMode",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay",
+    "DCG.Classes",
+    "Unity.InputSystem",
+    "DCG.Presentation",
+    "DCG.Bootstrap"
+  ],
+  "includePlatforms": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f606b0d4250cc2f4e8c44ae172f8e710, type: 3}
+  m_Name: Rifle_TuningPending
+  m_EditorClassIdentifier: DCG.Classes::DCG.Classes.Rifle.RifleTuning
+  referenceStatus: 0
+  moveSpeed: 4.5
+  sprintSpeed: 6.5
+  walkSpeed: 2
+  crouchSpeed: 2.2
+  proneSpeed: 1.1
+  aimSpeed: 2.3
+  jumpSpeed: 6
+  inputTimeout: 0.3
+  magazineSize: 30
+  reserveAmmo: 120
+  shotInterval: 0.086
+  reloadSeconds: 2.3
+  damage: 35
+  range: 180
+  bulletSpeed: 880
+  bulletGravity: 9.81
+  hipSpread: 1.5
+  aimSpread: 0.45
+  adsSpread: 0.06
+  recoilPerShot: 0.8
+  recoilRecovery: 2.5
+  maxRecoil: 9
+  mouseSensitivity: 0.12
+  adsSensitivity: 0.07
+  aimHoldThreshold: 0.18
+  standingHeight: 1.8
+  crouchHeight: 1.15
+  proneHeight: 0.7
+  hipFov: 70
+  shoulderFov: 56
+  adsFov: 42
+  shoulderOffset: 0.65
+  hipDistance: 3.1
+  aimDistance: 1.5

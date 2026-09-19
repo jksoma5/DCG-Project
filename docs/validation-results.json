@@ -1,0 +1,26 @@
+{
+  "editmode": {
+    "result": "Passed",
+    "total": "13",
+    "passed": "13",
+    "failed": "0",
+    "start-time": "2026-09-16 15:38:20Z",
+    "end-time": "2026-09-16 15:38:21Z"
+  },
+  "playmode": {
+    "result": "Passed",
+    "total": "9",
+    "passed": "9",
+    "failed": "0",
+    "start-time": "2026-09-16 15:38:56Z",
+    "end-time": "2026-09-16 15:38:58Z"
+  },
+  "playerSmoke": {
+    "passed": true,
+    "movedDistance": 5.216942,
+    "targetHealth": 0
+  },
+  "buildSucceeded": true,
+  "renderBackend": "D3D11",
+  "cameraCaptureIncludesOverlay": false
+}

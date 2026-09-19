@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 693a26ebb7c0c6e41b7241cf00b8c451, type: 3}
+  m_Name: Paul_Common
+  m_EditorClassIdentifier: DCG.Gameplay::DCG.Gameplay.PrototypeTuning
+  referenceStatus: 0
+  maxHealth: 200
+  moveSpeed: 5
+  arrivalDistance: 0.12
+  turnSpeed: 720
+  gravity: -25
+  attackRange: 6
+  windupSeconds: 0.15
+  recoverySeconds: 0.5
+  reloadSeconds: 1.2
+  magazineSize: 2
+  pelletCount: 4
+  damagePerPellet: 7
+  spreadDegrees: 9
+  repathSeconds: 0.3
+  acquireRange: 8
+  stuckSeconds: 0.6
+  cameraFollowSpeed: 12
+  cameraOffset: {x: 0, y: 18, z: -12}
+  cameraFov: 50

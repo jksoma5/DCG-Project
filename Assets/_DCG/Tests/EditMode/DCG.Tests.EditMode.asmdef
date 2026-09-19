@@ -1,0 +1,16 @@
+{
+  "name": "DCG.Tests.EditMode",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay",
+    "DCG.Classes",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

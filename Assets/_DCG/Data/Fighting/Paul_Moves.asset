@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3c129fde6174cc0b8cb4e27e30bf432, type: 3}
+  m_Name: Paul_Moves
+  m_EditorClassIdentifier: DCG.Gameplay:DCG.Gameplay.Fighting:FightMoveSet
+  moves:
+  - {fileID: 11400000, guid: 41002ec3abcac264cb1d95075c850bc1, type: 2}
+  - {fileID: 11400000, guid: 4e673a21a71e4ea4499985e02d57c5f1, type: 2}
+  - {fileID: 11400000, guid: ca0e06b33c5e72440aaa98ade42889df, type: 2}
+  - {fileID: 11400000, guid: f2477179d1312bb4d8840efa620571e3, type: 2}
+  - {fileID: 11400000, guid: 80ba53a4a74f8c84fafe74396d789175, type: 2}
+  - {fileID: 11400000, guid: 07e5ba51aa6f4d44a89b74e94ebe400a, type: 2}
+  - {fileID: 11400000, guid: a3ee4b3220047244995b742e53d73cc9, type: 2}
+  - {fileID: 11400000, guid: 66a5447847b08b846b4d1d5890729b44, type: 2}
+  - {fileID: 11400000, guid: 18958d9232a57284388adf5a44384686, type: 2}
+  - {fileID: 11400000, guid: f92014fcfc3f75c4d91ee658871a1181, type: 2}
+  - {fileID: 11400000, guid: 01d376f574c5708478842642ff03a92c, type: 2}
+  - {fileID: 11400000, guid: 1fe74005be9f113438abcb1cd34438b8, type: 2}
+  - {fileID: 11400000, guid: d9a97fe315d28d94591a9b9e4f3cfbc6, type: 2}
+  - {fileID: 11400000, guid: adec5e16ad041b84aab316dc3e1312f4, type: 2}
+  simultaneousWindow: 2
+  commandWindow: 20
+  forwardSpeed: 2.4
+  backSpeed: 1.8
+  dashSpeed: 5
+  sideSpeed: 3
+  jumpSpeed: 6
+  sideEpsilon: 0.05
+  tapFrames: 6
+  dashFrames: 10
+  doubleTapWindow: 14
+  allowSidestep: 1
+  counterStates: 48
+  downFrames: 36
+  getupFrames: 18
+  maxJuggleCost: 6
+  airDamageScale: 0.7
+  airDamageDecay: 0.1
+  minimumAirDamageScale: 0.2

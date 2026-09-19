@@ -1,0 +1,10 @@
+{
+  "name": "DCG.Presentation",
+  "rootNamespace": "DCG.Presentation",
+  "references": [
+    "DCG.Core",
+    "DCG.Gameplay"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

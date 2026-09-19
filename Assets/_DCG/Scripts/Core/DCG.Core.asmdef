@@ -1,0 +1,7 @@
+{
+  "name": "DCG.Core",
+  "rootNamespace": "DCG.Core",
+  "references": [],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "DCG.Gameplay",
+  "rootNamespace": "DCG.Gameplay",
+  "references": [
+    "DCG.Core"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}
