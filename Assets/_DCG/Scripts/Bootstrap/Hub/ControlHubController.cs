@@ -27,11 +27,15 @@ namespace DCG.Bootstrap.Hub
 
         uint nextActorId = 1;
         HubContext context;
+        float defaultFov, defaultNear, defaultFar;
 
         public uint NextActorId() => nextActorId++;
 
         void Awake()
         {
+            defaultFov = hubCamera.fieldOfView;
+            defaultNear = hubCamera.nearClipPlane;
+            defaultFar = hubCamera.farClipPlane;
             context = new HubContext {
                 World = world, Camera = hubCamera, CameraTransform = hubCamera.transform, Hub = this,
                 Map = map
@@ -51,6 +55,11 @@ namespace DCG.Bootstrap.Hub
                 ActiveModule = null;
             }
             world.AutomaticTicks = false;
+            // Modules set the lens they need (ADS fov, scope fov, near clip for a first person weapon).
+            // The select screen gets the camera back as the generator left it.
+            hubCamera.fieldOfView = defaultFov;
+            hubCamera.nearClipPlane = defaultNear;
+            hubCamera.farClipPlane = defaultFar;
             ApplyCursor(HubCursorMode.Free);
         }
 
@@ -92,6 +101,8 @@ namespace DCG.Bootstrap.Hub
             ReadHubKeys();
             ActiveModule?.UpdateView(Time.deltaTime);
         }
+
+        void LateUpdate() { ActiveModule?.LateUpdateView(Time.deltaTime); }
 
         // Esc and F5 belong to the hub, not to a class. A module's own input reader may also use Esc
         // (Vendetta releases the cursor with it), so the hub reads the keyboard directly and keeps the

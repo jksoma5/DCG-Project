@@ -21,8 +21,12 @@ namespace DCG.Bootstrap.Hub
         public void Draw(ControlHubController hub)
         {
             Prepare();
-            float width = 460, x = Screen.width * .5f - width * .5f, y = Screen.height * .5f - 190;
-            GUI.Box(new Rect(x, y, width, 380), string.Empty);
+            // The panel grows with the class list instead of assuming a fixed number of rows.
+            int count = 0;
+            foreach (var module in hub.Modules) if (module != null) count++;
+            float width = 460, height = 150 + count * 74;
+            float x = Screen.width * .5f - width * .5f, y = Screen.height * .5f - height * .5f;
+            GUI.Box(new Rect(x, y, width, height), string.Empty);
             GUI.Label(new Rect(x + 26, y + 18, width - 40, 40), "DCG / CONTROL HUB", title);
             GUI.Label(new Rect(x + 26, y + 58, width - 50, 34),
                 "One scene, every control. Pick a class. Esc returns here.", note);
@@ -36,8 +40,8 @@ namespace DCG.Bootstrap.Hub
                 GUI.Label(new Rect(x + 36, row + 46, width - 62, 18), module.Summary, note);
                 row += 74;
             }
-            GUI.Label(new Rect(x + 26, y + 344, width - 52, 20),
-                "PROTOTYPE / TUNING PENDING / placeholder map", note);
+            GUI.Label(new Rect(x + 26, y + height - 34, width - 52, 20),
+                "PROTOTYPE / TUNING PENDING / one unified map", note);
         }
     }
 }

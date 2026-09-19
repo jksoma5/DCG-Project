@@ -40,6 +40,12 @@ namespace DCG.Presentation
             scopeRoot.gameObject.SetActive(scoped);
             scopeRoot.localScale=Vector3.one*(.1f*Mathf.Tan(fov*.5f*Mathf.Deg2Rad));
         }
-        void OnDestroy(){if(maskMesh!=null)Destroy(maskMesh);}
+        void OnDestroy()
+        {
+            if(maskMesh!=null)Destroy(maskMesh);
+            // The rig created this child, so the rig removes it. The control hub detaches rigs from a
+            // shared camera and would otherwise leak one scope mask per class switch.
+            if(scopeRoot!=null)Destroy(scopeRoot.gameObject);
+        }
     }
 }

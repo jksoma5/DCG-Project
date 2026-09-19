@@ -5,6 +5,8 @@ using DCG.Core;
 using DCG.Gameplay;
 using DCG.Gameplay.Navigation;
 using DCG.Classes.Vendetta;
+using DCG.Classes.Rifle;
+using DCG.Classes.Sniper;
 using DCG.Bootstrap.Hub;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -23,11 +25,13 @@ namespace DCG.Editor
     // stances and Vendetta's collisions, a long lane running north for the M416 and the TRG, and
     // high ground to the south that is both Vendetta's flight destination and a TRG firing position.
     // No practice targets are placed here; the active module creates and removes its own set.
+    // Stage 3 added the M416 and the TRG, which stand at the lane firing line and shoot north.
     public static class ControlHubSetup
     {
         const string Root = "Assets/_DCG/";
         public const string ScenePath = Root + "Scenes/ControlHub.unity";
         static Material floor, cover, teal, coral, line, blade, stage, accent;
+        static Material rifleTarget, rifleAccent, sniperTarget, sniperAccent, sniperScope;
 
         [MenuItem("DCG/Generate Control Hub")]
         public static void Generate()
@@ -52,12 +56,29 @@ namespace DCG.Editor
                 blade = Load<Material>("Materials/VendettaBlade.mat");
                 stage = Load<Material>("Materials/PaulFloor.mat");
                 accent = Load<Material>("Materials/RifleAccent.mat");
+                rifleTarget = Load<Material>("Materials/RifleTarget.mat");
+                rifleAccent = accent;
+                sniperTarget = Load<Material>("Materials/SniperTarget.mat");
+                sniperAccent = Load<Material>("Materials/SniperAccent.mat");
+                sniperScope = Load<Material>("Materials/SniperScope.mat");
 
                 var gravesTuning = Load<PrototypeTuning>("Data/Classes/Graves_TuningPending.asset");
                 var vendettaTuning = Load<VendettaTuning>("Data/Classes/Vendetta_TuningPending.asset");
                 var vendettaCommon = Load<PrototypeTuning>("Data/Classes/Vendetta_Common.asset");
                 var gravesPrefab = Load<GameObject>("Prefabs/Actors/Graves.prefab");
                 var vendettaPrefab = Load<GameObject>("Prefabs/Actors/Vendetta.prefab");
+                var rifleTuning = Load<RifleTuning>("Data/Classes/Rifle_TuningPending.asset");
+                var rifleCommon = Load<PrototypeTuning>("Data/Classes/Rifle_Common.asset");
+                var riflePrefab = Load<GameObject>("Prefabs/Actors/Rifle.prefab");
+                var adsGunPrefab = Load<GameObject>("Prefabs/Weapons/RifleAdsGun.prefab");
+                var sniperTuning = Load<SniperTuning>("Data/Classes/Sniper_TuningPending.asset");
+                var sniperCommon = Load<PrototypeTuning>("Data/Classes/Sniper_Common.asset");
+                var sniperPrefab = Load<GameObject>("Prefabs/Actors/Sniper.prefab");
+                var sniperWeapons = new[] {
+                    Load<GameObject>("Prefabs/Weapons/SniperWeapon1.prefab"),
+                    Load<GameObject>("Prefabs/Weapons/SniperWeapon2.prefab"),
+                    Load<GameObject>("Prefabs/Weapons/SniperWeapon3.prefab")
+                };
                 var controls = Load<InputActionAsset>("Input/DCGControls.inputactions");
 
                 RenderSettings.ambientMode = AmbientMode.Flat;
@@ -185,14 +206,29 @@ namespace DCG.Editor
                 vendetta.common = vendettaCommon; vendetta.playerMaterial = teal;
                 vendetta.targetMaterial = coral; vendetta.bladeMaterial = blade;
 
-                hub.modules = new ControlModuleBase[] { graves, vendetta };
+                var rifleHost = new GameObject("Rifle module");
+                rifleHost.transform.SetParent(hubObject.transform, false);
+                var rifleModule = rifleHost.AddComponent<RifleModule>();
+                rifleModule.actorPrefab = riflePrefab; rifleModule.adsGunPrefab = adsGunPrefab;
+                rifleModule.tuning = rifleTuning; rifleModule.common = rifleCommon;
+                rifleModule.targetMaterial = rifleTarget; rifleModule.tracerMaterial = rifleAccent;
+
+                var sniperHost = new GameObject("Sniper module");
+                sniperHost.transform.SetParent(hubObject.transform, false);
+                var sniperModule = sniperHost.AddComponent<SniperModule>();
+                sniperModule.actorPrefab = sniperPrefab; sniperModule.weaponPrefabs = sniperWeapons;
+                sniperModule.tuning = sniperTuning; sniperModule.common = sniperCommon;
+                sniperModule.targetMaterial = sniperTarget; sniperModule.tracerMaterial = sniperAccent;
+                sniperModule.scopeMaterial = sniperScope;
+
+                hub.modules = new ControlModuleBase[] { graves, vendetta, rifleModule, sniperModule };
 
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 AssetDatabase.SaveAssets();
                 if (!EditorBuildSettings.scenes.Any(s => s.path == ScenePath))
                     EditorBuildSettings.scenes = EditorBuildSettings.scenes
                         .Concat(new[] { new EditorBuildSettingsScene(ScenePath, true) }).ToArray();
-                Debug.Log("DCG_HUB_SETUP_OK: ControlHub generated with the unified map and 2 modules.");
+                Debug.Log("DCG_HUB_SETUP_OK: ControlHub generated with the unified map and 4 modules.");
             }
             finally
             {
@@ -206,7 +242,8 @@ namespace DCG.Editor
             var asset = AssetDatabase.LoadAssetAtPath<T>(Root + relative);
             if (asset == null && !relative.Contains("ControlHubGrid"))
                 throw new InvalidOperationException("Missing asset: " + Root + relative +
-                    ". Run DCG/Generate Control Lab and the per-class lab generators first.");
+                    ". Run DCG/Generate Control Lab and the per-class lab generators first; the rifle " +
+                    "and sniper generators also export the first person view model prefabs.");
             return asset;
         }
 

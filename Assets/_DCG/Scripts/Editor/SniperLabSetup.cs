@@ -71,6 +71,10 @@ namespace DCG.Editor
                 lab.world=world;lab.player=player;lab.sniper=sniper;lab.input=input;lab.rig=rig;
                 lab.weapons=new[]{Weapon("TRG prototype",1,camera.transform,metal,wood,accent),
                     Weapon("Pistol prototype",2,camera.transform,metal,wood,accent),Weapon("Knife prototype",3,camera.transform,metal,wood,accent)};
+                // Exported so the control hub attaches the same three view models to its shared camera.
+                Directory.CreateDirectory(Root+"Prefabs/Weapons");
+                for(int i=0;i<lab.weapons.Length;i++)
+                    PrefabUtility.SaveAsPrefabAsset(lab.weapons[i].gameObject,Root+"Prefabs/Weapons/SniperWeapon"+(i+1)+".prefab");
                 lab.tracer=new GameObject("Shot tracer").AddComponent<LineRenderer>();
                 lab.tracer.sharedMaterial=accent;lab.tracer.positionCount=2;lab.tracer.startWidth=lab.tracer.endWidth=.015f;lab.tracer.enabled=false;
                 lab.gameObject.AddComponent<SniperSmokeProbe>();

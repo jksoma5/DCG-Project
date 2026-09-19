@@ -63,6 +63,7 @@ namespace DCG.Bootstrap.Hub
         void ResetState();
         void TickFixed();
         void UpdateView(float deltaTime);
+        void LateUpdateView(float deltaTime);
         void DrawHud();
     }
 }

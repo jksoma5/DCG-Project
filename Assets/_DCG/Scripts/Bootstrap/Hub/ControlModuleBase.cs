@@ -57,6 +57,7 @@ namespace DCG.Bootstrap.Hub
         public virtual void ResetState() { }
         public virtual void TickFixed() { }
         public virtual void UpdateView(float deltaTime) { }
+        public virtual void LateUpdateView(float deltaTime) { }
         public virtual void DrawHud() { }
 
         protected abstract void OnActivate();

@@ -5,6 +5,8 @@ using DCG.Gameplay;
 using DCG.Bootstrap.Hub;
 using DCG.Classes.Graves;
 using DCG.Classes.Vendetta;
+using DCG.Classes.Rifle;
+using DCG.Classes.Sniper;
 using DCG.Presentation;
 using NUnit.Framework;
 using UnityEngine;
@@ -17,6 +19,8 @@ namespace DCG.Tests
     // exactly one input reader, one camera and one HUD alive, and must not leak actors.
     // Stage 2 adds the unified map: the anchors a module builds on, a nav grid that covers the plaza
     // and stops at the lane, and target sets that belong to the module rather than to the scene.
+    // Stage 3 adds the M416 and the TRG, so the switching rules are now checked over four classes and
+    // over the first person view models and camera lens those two bring with them.
     public sealed class ControlHubTests
     {
         ControlHubController hub;
@@ -189,6 +193,98 @@ namespace DCG.Tests
 
             graves.TogglePatrol();
             Assert.That(graves.PatrolRunning, Is.False);
+        }
+
+        [UnityTest] public IEnumerator EveryPortedClassIsSelectable()
+        {
+            var expected = new[] { ClassId.Graves, ClassId.Vendetta, ClassId.Rifle, ClassId.Sniper };
+            foreach (var id in expected)
+            {
+                Assert.That(hub.Select(id), Is.True, "The hub does not offer " + id);
+                yield return null;
+                Assert.That(hub.ActiveModule.Id, Is.EqualTo(id));
+                Assert.That(TeamCount(1), Is.GreaterThan(0), id + " has no practice targets.");
+                Assert.That(Count<Camera>(), Is.EqualTo(1), id + " brought a second camera.");
+                Assert.That(Count<AudioListener>(), Is.EqualTo(1));
+            }
+        }
+
+        [UnityTest] public IEnumerator ShootingClassesStandOnTheLaneAndFaceTheTargets()
+        {
+            foreach (var id in new[] { ClassId.Rifle, ClassId.Sniper })
+            {
+                hub.Select(id);
+                yield return null;
+                var player = PlayerOf(0);
+                Assert.That((player.transform.position - hub.map.laneStart.position).magnitude, Is.LessThan(1.5f),
+                    id + " must start at the lane firing line.");
+                // Every target is further down the lane than the firing line, so the lane is what is
+                // being shot down rather than the plaza the other classes use.
+                foreach (var actor in hub.world.Actors)
+                    if (actor.team == 1)
+                        Assert.That(actor.transform.position.z, Is.GreaterThan(player.transform.position.z),
+                            id + " has a target behind the firing line.");
+            }
+        }
+
+        [UnityTest] public IEnumerator FirstPersonViewModelsAndLensDoNotSurviveTheSwitch()
+        {
+            hub.Select(ClassId.Sniper);
+            yield return null;
+            Assert.That(Count<SniperInputReader>(), Is.EqualTo(1));
+            Assert.That(Count<FirstPersonScopeRig>(), Is.EqualTo(1));
+            int cameraChildren = hub.hubCamera.transform.childCount;
+            Assert.That(cameraChildren, Is.GreaterThan(0), "The TRG carries view models on the camera.");
+
+            hub.Select(ClassId.Rifle);
+            yield return null;
+            Assert.That(Count<SniperInputReader>(), Is.Zero);
+            Assert.That(Count<FirstPersonScopeRig>(), Is.Zero);
+            Assert.That(Count<ShoulderCameraRig>(), Is.EqualTo(1));
+            Assert.That(Count<RifleInputReader>(), Is.EqualTo(1));
+
+            hub.ShowSelect();
+            yield return null;
+            // Nothing a class hung on the shared camera may outlive it: not its weapons, not its
+            // scope mask, not the lens it set.
+            Assert.That(hub.hubCamera.transform.childCount, Is.Zero,
+                "A class left view models on the shared camera.");
+            Assert.That(Count<ShoulderCameraRig>(), Is.Zero);
+            Assert.That(Count<RifleInputReader>(), Is.Zero);
+        }
+
+        [UnityTest] public IEnumerator SwitchingThroughEveryClassLeaksNothing()
+        {
+            var order = new[] { ClassId.Graves, ClassId.Rifle, ClassId.Sniper, ClassId.Vendetta };
+            hub.Select(ClassId.Graves);
+            yield return null;
+            int cameras = Count<Camera>();
+
+            for (int round = 0; round < 2; round++)
+                foreach (var id in order)
+                {
+                    hub.Select(id);
+                    yield return null;
+                    Assert.That(Count<Camera>(), Is.EqualTo(cameras), "Camera count grew at " + id);
+                    Assert.That(Count<AudioListener>(), Is.EqualTo(1), "AudioListener count grew at " + id);
+                    Assert.That(Count<GravesInputReader>() + Count<VendettaInputReader>() +
+                        Count<RifleInputReader>() + Count<SniperInputReader>(), Is.EqualTo(1),
+                        "Exactly one input reader may be alive, at " + id);
+                    var seen = new HashSet<uint>();
+                    foreach (var actor in hub.world.Actors)
+                        Assert.That(seen.Add(actor.Id.Value), Is.True, "Duplicate actor id at " + id);
+                }
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(Count<ActorSimulation>(), Is.Zero);
+            Assert.That(hub.hubCamera.transform.childCount, Is.Zero);
+        }
+
+        ActorSimulation PlayerOf(int team)
+        {
+            foreach (var actor in hub.world.Actors) if (actor.team == team) return actor;
+            return null;
         }
 
         int TeamCount(int team)

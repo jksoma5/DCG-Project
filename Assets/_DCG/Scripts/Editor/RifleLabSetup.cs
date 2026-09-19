@@ -74,6 +74,9 @@ namespace DCG.Editor
                 lab.model=player.transform.Find("Body");
                 lab.adsGun=Gun("Local ADS weapon",metal,accent);lab.adsGun.SetParent(camera.transform,false);
                 lab.adsGun.localPosition=new Vector3(0,-.09425f,.32f);lab.adsGun.localScale=Vector3.one*.65f;
+                // Exported so the control hub can attach the same ADS weapon to its shared camera.
+                Directory.CreateDirectory(Root+"Prefabs/Weapons");
+                PrefabUtility.SaveAsPrefabAsset(lab.adsGun.gameObject,Root+"Prefabs/Weapons/RifleAdsGun.prefab");
                 lab.adsGun.gameObject.SetActive(false);
                 lab.tracer=new GameObject("Bullet tracer").AddComponent<LineRenderer>();
                 lab.tracer.sharedMaterial=accent;lab.tracer.positionCount=2;lab.tracer.startWidth=lab.tracer.endWidth=.025f;lab.tracer.enabled=false;
