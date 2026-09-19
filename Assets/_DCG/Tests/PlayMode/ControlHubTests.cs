@@ -2,11 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using DCG.Core;
 using DCG.Gameplay;
+using DCG.Bootstrap;
 using DCG.Bootstrap.Hub;
 using DCG.Classes.Graves;
 using DCG.Classes.Vendetta;
 using DCG.Classes.Rifle;
 using DCG.Classes.Sniper;
+using DCG.Classes.Paul;
+using DCG.Gameplay.Fighting;
 using DCG.Presentation;
 using NUnit.Framework;
 using UnityEngine;
@@ -21,6 +24,8 @@ namespace DCG.Tests
     // and stops at the lane, and target sets that belong to the module rather than to the scene.
     // Stage 3 adds the M416 and the TRG, so the switching rules are now checked over four classes and
     // over the first person view models and camera lens those two bring with them.
+    // Stage 4 adds Paul, the one class the hub steps itself: the tick policy, the input update mode and
+    // the frame counter all have to survive leaving him and coming back.
     public sealed class ControlHubTests
     {
         ControlHubController hub;
@@ -197,7 +202,7 @@ namespace DCG.Tests
 
         [UnityTest] public IEnumerator EveryPortedClassIsSelectable()
         {
-            var expected = new[] { ClassId.Graves, ClassId.Vendetta, ClassId.Rifle, ClassId.Sniper };
+            var expected = new[] { ClassId.Graves, ClassId.Vendetta, ClassId.Rifle, ClassId.Sniper, ClassId.Paul };
             foreach (var id in expected)
             {
                 Assert.That(hub.Select(id), Is.True, "The hub does not offer " + id);
@@ -255,7 +260,7 @@ namespace DCG.Tests
 
         [UnityTest] public IEnumerator SwitchingThroughEveryClassLeaksNothing()
         {
-            var order = new[] { ClassId.Graves, ClassId.Rifle, ClassId.Sniper, ClassId.Vendetta };
+            var order = new[] { ClassId.Graves, ClassId.Rifle, ClassId.Paul, ClassId.Sniper, ClassId.Vendetta };
             hub.Select(ClassId.Graves);
             yield return null;
             int cameras = Count<Camera>();
@@ -268,7 +273,8 @@ namespace DCG.Tests
                     Assert.That(Count<Camera>(), Is.EqualTo(cameras), "Camera count grew at " + id);
                     Assert.That(Count<AudioListener>(), Is.EqualTo(1), "AudioListener count grew at " + id);
                     Assert.That(Count<GravesInputReader>() + Count<VendettaInputReader>() +
-                        Count<RifleInputReader>() + Count<SniperInputReader>(), Is.EqualTo(1),
+                        Count<RifleInputReader>() + Count<SniperInputReader>() +
+                        Count<FighterInputReader>(), Is.EqualTo(1),
                         "Exactly one input reader may be alive, at " + id);
                     var seen = new HashSet<uint>();
                     foreach (var actor in hub.world.Actors)
@@ -279,6 +285,140 @@ namespace DCG.Tests
             yield return null;
             Assert.That(Count<ActorSimulation>(), Is.Zero);
             Assert.That(hub.hubCamera.transform.childCount, Is.Zero);
+        }
+
+        [UnityTest] public IEnumerator PaulRunsOnTheHubFixedTickAndHisStageIsTheEastWestAxis()
+        {
+            hub.Select(ClassId.Paul);
+            yield return null;
+            var paul = (PaulModule)hub.ActiveModule;
+            Assert.That(paul.Match, Is.Not.Null);
+            Assert.That(hub.world.AutomaticTicks, Is.False, "The hub drives the fighting loop itself.");
+            Assert.That(hub.world.Actors.Count, Is.EqualTo(2), "A fight is always two fighters.");
+
+            // Facing positions straddle the plaza centre along X, so screen right is east (doc 12, 1-1).
+            var west = paul.Match.first.transform.position;
+            var east = paul.Match.second.transform.position;
+            Assert.That(west.x, Is.LessThan(east.x));
+            Assert.That(west.z, Is.EqualTo(east.z).Within(.01f));
+            Assert.That(paul.Match.first.Side, Is.Not.EqualTo(paul.Match.second.Side),
+                "The two fighters must face each other.");
+
+            int start = paul.Match.Frame;
+            for (int step = 0; step < 30; step++) yield return new WaitForFixedUpdate();
+            int advanced = paul.Match.Frame - start;
+            // One fight frame per fixed tick, no FrameClock accumulation of its own.
+            Assert.That(advanced, Is.InRange(25, 35), "The match advanced " + advanced + " frames in 30 ticks.");
+        }
+
+        [UnityTest] public IEnumerator LeavingPaulGivesTheTickPolicyAndInputModeBack()
+        {
+            var modeBefore = UnityEngine.InputSystem.InputSystem.settings.updateMode;
+
+            hub.Select(ClassId.Paul);
+            yield return null;
+            Assert.That(hub.world.AutomaticTicks, Is.False);
+            Assert.That(Count<FighterInputReader>(), Is.EqualTo(1));
+
+            // The class that follows must tick normally again. This is conflict 3 in doc 14: the lab's
+            // FighterMatch.Initialize turned automatic ticks off globally and never turned them back on.
+            hub.Select(ClassId.Rifle);
+            yield return null;
+            Assert.That(hub.world.AutomaticTicks, Is.True, "Paul left the world switched off.");
+            Assert.That(Count<FighterInputReader>(), Is.Zero);
+            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(modeBefore),
+                "Paul's manual input update mode leaked into another class.");
+
+            uint tick = hub.world.Tick;
+            for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+            Assert.That(hub.world.Tick, Is.GreaterThan(tick), "The following class did not advance.");
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(modeBefore));
+        }
+
+        [UnityTest] public IEnumerator ComingBackToPaulStartsHisFramesOverCleanly()
+        {
+            hub.Select(ClassId.Paul);
+            yield return null;
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            var paul = (PaulModule)hub.ActiveModule;
+            Assert.That(paul.Match.Frame, Is.GreaterThan(0));
+
+            hub.Select(ClassId.Graves);
+            yield return null;
+            hub.Select(ClassId.Paul);
+            yield return null;
+            paul = (PaulModule)hub.ActiveModule;
+            Assert.That(paul.Match.Frame, Is.LessThan(3), "A returning fight must start from frame zero.");
+            Assert.That(paul.Match.first.State.Phase, Is.EqualTo(paul.Match.second.State.Phase),
+                "Neither fighter may return mid-move.");
+            Assert.That(paul.RecordedFrames, Is.Zero, "The tape belongs to the session that recorded it.");
+            Assert.That(paul.Match.first.Actor.Health.Current,
+                Is.EqualTo(paul.Match.second.Actor.Health.Current), "Both fighters start at full health.");
+
+            // The frames keep coming after the round trip, at the same one-per-tick rate.
+            int frame = paul.Match.Frame;
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Match.Frame - frame, Is.InRange(15, 25));
+        }
+
+        [UnityTest] public IEnumerator PaulRecordsAndReplaysOnTheDummy()
+        {
+            hub.Select(ClassId.Paul);
+            yield return null;
+            var paul = (PaulModule)hub.ActiveModule;
+
+            paul.SetRecording(true);
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Recording, Is.True);
+            Assert.That(paul.RecordedFrames, Is.GreaterThan(0), "Recording must fill the tape.");
+
+            paul.StartReplay();
+            Assert.That(paul.Recording, Is.False);
+            Assert.That(paul.DummyMode, Is.EqualTo(FightDummyMode.Replay));
+            // A replaying dummy is no longer held in place; that is what makes it play back movement.
+            for (int step = 0; step < 5; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Match.second.HoldPosition, Is.False);
+        }
+
+        // The condition doc 14 wrote down for stage 1 and nothing had actually been checking: the input
+        // maps that are enabled are exactly the active class's, and nothing is enabled on the select
+        // screen. Counting reader components was not enough - a reader whose OnEnable ran before its
+        // asset was assigned is present and bound to nothing.
+        [UnityTest] public IEnumerator EnabledInputMapsAreExactlyTheActiveClasses()
+        {
+            Assert.That(EnabledMaps(), Is.Empty, "The select screen must leave every game map disabled.");
+
+            var expected = new Dictionary<ClassId, string[]> {
+                { ClassId.Graves, new[] { "Graves", "UI" } },
+                { ClassId.Vendetta, new[] { "Vendetta" } },
+                { ClassId.Rifle, new[] { "Rifle" } },
+                { ClassId.Sniper, new[] { "Sniper" } },
+                { ClassId.Paul, new[] { "Fighter" } }
+            };
+            foreach (var pair in expected)
+            {
+                hub.Select(pair.Key);
+                yield return null;
+                var maps = EnabledMaps();
+                Assert.That(maps, Is.EquivalentTo(pair.Value),
+                    pair.Key + " has these maps enabled instead: " + string.Join(", ", maps));
+            }
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(EnabledMaps(), Is.Empty, "A class left its input map enabled behind it.");
+        }
+
+        static List<string> EnabledMaps()
+        {
+            var names = new List<string>();
+            foreach (var asset in Resources.FindObjectsOfTypeAll<UnityEngine.InputSystem.InputActionAsset>())
+                foreach (var map in asset.actionMaps)
+                    if (map.enabled) names.Add(map.name);
+            return names;
         }
 
         ActorSimulation PlayerOf(int team)

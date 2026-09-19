@@ -21,6 +21,7 @@ namespace DCG.Bootstrap.Hub
         readonly List<GameObject> spawned = new List<GameObject>();
         readonly List<ActorSimulation> registered = new List<ActorSimulation>();
         readonly List<Component> attached = new List<Component>();
+        readonly List<GameObject> deferred = new List<GameObject>();
 
         public void Activate(HubContext context)
         {
@@ -34,6 +35,16 @@ namespace DCG.Bootstrap.Hub
         {
             if (!Active) return;
             OnDeactivate();
+            // Objects holding a deferred component are switched off first, which runs their OnDisable
+            // now rather than at the end of the frame: that is where an input reader gives back its
+            // action map, the cursor and the input update mode.
+            for (int i = deferred.Count - 1; i >= 0; i--)
+            {
+                if (deferred[i] == null) continue;
+                deferred[i].SetActive(false);
+                Destroy(deferred[i]);
+            }
+            deferred.Clear();
             // Components on the shared camera go first and are disabled before destruction so their
             // OnDisable runs now, not at the end of the frame. Input readers release their action maps there.
             for (int i = attached.Count - 1; i >= 0; i--)
@@ -82,6 +93,21 @@ namespace DCG.Bootstrap.Hub
         {
             var component = host.AddComponent<T>();
             attached.Add(component);
+            return component;
+        }
+
+        // For a component whose OnEnable does the real work from its serialized fields - every input
+        // reader binds its action map there. AddComponent runs OnEnable immediately, before a module
+        // can assign anything, so the component is built on its own object while that object is still
+        // inactive and only switched on once it is configured.
+        protected T AttachDeferred<T>(string name, System.Action<T> configure) where T : Component
+        {
+            var host = new GameObject(name);
+            host.SetActive(false);
+            var component = host.AddComponent<T>();
+            configure(component);
+            deferred.Add(host);
+            host.SetActive(true);
             return component;
         }
 

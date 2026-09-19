@@ -55,9 +55,10 @@ namespace DCG.Bootstrap.Hub
             rig = Attach<FirstPersonScopeRig>(host);
             rig.viewCamera = camera; rig.scopeMaterial = scopeMaterial;
 
-            input = Attach<SniperInputReader>(host);
-            input.actor = player; input.sniper = sniper; input.controls = Context.Hub.controls;
-            input.ResetRequested = ResetState;
+            input = AttachDeferred<SniperInputReader>("TRG input", reader => {
+                reader.actor = player; reader.sniper = sniper; reader.controls = Context.Hub.controls;
+                reader.ResetRequested = ResetState;
+            });
 
             weapons = new Transform[weaponPrefabs.Length];
             weaponRest = new Vector3[weaponPrefabs.Length];

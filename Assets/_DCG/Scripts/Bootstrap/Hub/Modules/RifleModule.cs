@@ -56,10 +56,11 @@ namespace DCG.Bootstrap.Hub
             rig = Attach<ShoulderCameraRig>(host);
             rig.viewCamera = camera;
 
-            input = Attach<RifleInputReader>(host);
-            input.actor = player; input.rifle = rifle; input.worldCamera = camera;
-            input.controls = Context.Hub.controls;
-            input.ResetRequested = ResetState;
+            input = AttachDeferred<RifleInputReader>("M416 input", reader => {
+                reader.actor = player; reader.rifle = rifle; reader.worldCamera = camera;
+                reader.controls = Context.Hub.controls;
+                reader.ResetRequested = ResetState;
+            });
 
             adsGun = Track(Instantiate(adsGunPrefab)).transform;
             adsGun.SetParent(Context.CameraTransform, false);

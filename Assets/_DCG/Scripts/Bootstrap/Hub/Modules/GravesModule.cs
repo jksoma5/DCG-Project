@@ -60,9 +60,10 @@ namespace DCG.Bootstrap.Hub
             rig = Attach<TopDownRig>(host);
             rig.target = player.transform; rig.tuning = tuning;
 
-            input = Attach<GravesInputReader>(host);
-            input.actor = player; input.worldCamera = Context.Camera;
-            input.controls = Context.Hub.controls;
+            input = AttachDeferred<GravesInputReader>("Graves input", reader => {
+                reader.actor = player; reader.worldCamera = Context.Camera;
+                reader.controls = Context.Hub.controls;
+            });
 
             overlay = Attach<DebugOverlay>(host);
             overlay.actor = player; overlay.worldCamera = Context.Camera;

@@ -54,9 +54,10 @@ namespace DCG.Bootstrap.Hub
             rig.target = player.transform; rig.pivotOffset = tuning.cameraPivot;
             rig.distance = tuning.cameraDistance; rig.radius = tuning.cameraRadius;
 
-            input = Attach<VendettaInputReader>(host);
-            input.actor = player; input.tuning = tuning; input.controls = Context.Hub.controls;
-            input.ResetRequested = ResetState;
+            input = AttachDeferred<VendettaInputReader>("Vendetta input", reader => {
+                reader.actor = player; reader.tuning = tuning; reader.controls = Context.Hub.controls;
+                reader.ResetRequested = ResetState;
+            });
 
             thrownSword = Track(Blade("Vendetta thrown sword")).transform;
             thrownSword.gameObject.SetActive(false);
