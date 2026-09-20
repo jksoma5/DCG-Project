@@ -15,6 +15,9 @@ namespace DCG.Gameplay
         public CharacterMotor Motor { get; private set; }
         public CombatController Combat { get; private set; }
         public IMovementPolicy Movement { get; private set; }
+        // Set by a FightReactionReceiver on the same object. While it is busy, a fighter's hit owns this
+        // body: the class cannot move or act its way out of a combo.
+        public DCG.Gameplay.Fighting.FightReactionReceiver Reaction { get; set; }
         public SimulationWorld World { get; private set; }
         public uint LastSequence { get; private set; }
         public bool Initialized => Health != null;
@@ -38,6 +41,9 @@ namespace DCG.Gameplay
         }
         public void Step(float dt, uint tick)
         {
+            // A hit reaction runs before the alive check, so a body that was launched keeps falling and
+            // lands instead of stopping in the air the moment it dies.
+            if (Reaction != null && Reaction.Busy) { Reaction.Step(dt); return; }
             if (!Health.IsAlive) return;
             // A fighter advances itself on its own frame loop; stepping it here too would double its
             // gravity and movement in the same tick.

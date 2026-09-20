@@ -99,6 +99,19 @@ namespace DCG.Bootstrap.Hub
             var otherFighter = opponent as PaulModule;
             Match.SetOpponent(otherFighter != null ? otherFighter.Fighter : null, opponent.PrimaryActor);
             if (rig != null) rig.second = Match.DefenderTransform;
+            if (otherFighter == null) GiveReactions(opponent.PrimaryActor);
+        }
+
+        // A class from another game has no reaction of its own, so the fighter lends it one: the same
+        // state machine his own victim uses, carrying his move set's down, getup and juggle limits.
+        // Without this his combos are single hits with damage, because nothing holds the other body
+        // still long enough for the second hit to arrive.
+        void GiveReactions(ActorSimulation opponent)
+        {
+            if (opponent == null) return;
+            var receiver = opponent.GetComponent<FightReactionReceiver>();
+            if (receiver == null) receiver = opponent.gameObject.AddComponent<FightReactionReceiver>();
+            receiver.rules = first.moveSet;
         }
 
         protected override void OnDeactivate()

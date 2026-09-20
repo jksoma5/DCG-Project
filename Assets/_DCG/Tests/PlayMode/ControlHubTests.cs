@@ -570,6 +570,108 @@ namespace DCG.Tests
             Assert.That(paul.Match.Frame - frame, Is.GreaterThan(10));
         }
 
+        // A combo is not damage, it is the other body being held still long enough for the next hit. The
+        // opponent of a fighter therefore has to be launchable, juggleable and knocked down, even when it
+        // is a class from a different game with no reactions of its own.
+        [UnityTest] public IEnumerator PaulsComboLandsOnAClassThatIsNotAFighter()
+        {
+            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Sniper), Is.True);
+            yield return null;
+            var paul = (PaulModule)hub.ActiveModule;
+            var victim = hub.OpponentModule.PrimaryActor;
+
+            var receiver = victim.GetComponent<FightReactionReceiver>();
+            Assert.That(receiver, Is.Not.Null, "The fighter has to lend his opponent a reaction.");
+            Assert.That(receiver.rules, Is.Not.Null, "The reaction needs the attacker's juggle rules.");
+            Assert.That(victim.Reaction, Is.EqualTo(receiver));
+
+            // Put them in reach of each other. The uppercut reaches about two metres.
+            Place(paul.Match.first.transform, new Vector3(0, 0, 0));
+            Place(victim.transform, new Vector3(0, 0, 1.2f));
+            Physics.SyncTransforms();
+            float full = victim.Health.Current;
+
+            // df+2: the launcher.
+            Step(paul, 3, FightButtons.RP);
+            for (int frame = 0; frame < 20 && !receiver.State.IsAirborne; frame++) Step(paul, 5, 0);
+            Assert.That(receiver.State.IsAirborne, Is.True, "The launcher must take the other class off the ground.");
+            Assert.That(victim.Health.Current, Is.LessThan(full), "A hit still does damage.");
+            float afterLauncher = victim.Health.Current;
+
+            // Airborne, and rising: the body belongs to the reaction, not to the class. Keep hitting until
+            // one of those hits lands as a juggle hit.
+            float peak = 0;
+            bool airHit = false;
+            for (int frame = 0; frame < 90 && !airHit; frame++)
+            {
+                Step(paul, 5, FightButtons.LP);
+                peak = Mathf.Max(peak, victim.transform.position.y);
+                if (paul.Match.first.LastResult == "Air hit") airHit = true;
+            }
+            Assert.That(peak, Is.GreaterThan(.3f), "The launched body should actually leave the ground.");
+            Assert.That(airHit, Is.True, "A second hit in the air must register as a juggle hit.");
+            Assert.That(victim.Health.Current, Is.LessThan(afterLauncher), "The juggle hit must connect.");
+            Assert.That(receiver.State.JuggleCost, Is.GreaterThan(0), "A juggle has to be counted and scaled.");
+
+            // Stop hitting and the combo ends the way it does between fighters: on the floor.
+            for (int frame = 0; frame < 300 && !receiver.State.IsDown; frame++) Step(paul, 5, 0);
+            Assert.That(receiver.State.IsDown, Is.True, "A juggle ends on the floor.");
+            Assert.That(victim.transform.position.y, Is.LessThan(.3f));
+
+            // And it gets up again: the class takes its body back once the reaction is over.
+            for (int frame = 0; frame < 120 && receiver.Busy; frame++) Step(paul, 5, 0);
+            Assert.That(receiver.Busy, Is.False, "The opponent must recover, not stay down forever.");
+        }
+
+        // While a reaction owns the body, the class underneath cannot act its way out of it.
+        [UnityTest] public IEnumerator AJuggledClassCannotWalkOutOfTheCombo()
+        {
+            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Rifle), Is.True);
+            yield return null;
+            var paul = (PaulModule)hub.ActiveModule;
+            var victim = hub.OpponentModule.PrimaryActor;
+            Place(paul.Match.first.transform, new Vector3(0, 0, 0));
+            Place(victim.transform, new Vector3(0, 0, 1.2f));
+            Physics.SyncTransforms();
+
+            Step(paul, 3, FightButtons.RP);
+            for (int frame = 0; frame < 20 && !victim.Reaction.State.IsAirborne; frame++) Step(paul, 5, 0);
+            Assert.That(victim.Reaction.State.IsAirborne, Is.True);
+
+            // Ask the class to sprint away while it is in the air. The reaction is stepping the body, so
+            // the request cannot move it horizontally.
+            Vector3 before = victim.transform.position;
+            for (int frame = 0; frame < 10; frame++)
+            {
+                hub.world.Session.Submit(victim.Id, new PlayerCommand {
+                    Envelope = new CommandEnvelope { ActorId = victim.Id, Sequence = (uint)(9000 + frame),
+                        ClientTick = hub.world.Tick, CommandType = CommandType.DirectControl },
+                    Direct = new DirectControlFrame { MoveAxes = new Vector2(1, 1),
+                        HeldButtons = ControlButtons.Sprint }
+                });
+                Step(paul, 5, 0);
+            }
+            Vector3 drift = victim.transform.position - before;
+            drift.y = 0;
+            Assert.That(drift.magnitude, Is.LessThan(1.5f),
+                "A sprinting request must not carry a juggled body away; it drifted " + drift.magnitude);
+        }
+
+        static void Place(Transform who, Vector3 at)
+        {
+            var controller = who.GetComponent<CharacterController>();
+            if (controller != null) controller.enabled = false;
+            who.position = at;
+            if (controller != null) controller.enabled = true;
+        }
+
+        // One hub tick, in the hub's own order: the world first, then the fight frame.
+        void Step(PaulModule paul, int direction, FightButtons buttons)
+        {
+            hub.world.Step(Time.fixedDeltaTime);
+            paul.Tick(new FightInputFrame { Direction = direction, Pressed = buttons, Held = buttons });
+        }
+
         ActorSimulation PlayerOf(int team)
         {
             foreach (var actor in hub.world.Actors) if (actor.team == team) return actor;

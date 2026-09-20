@@ -28,14 +28,27 @@ namespace DCG.Gameplay.Fighting
     {
         public readonly FighterAgent Attacker;
         public readonly ActorSimulation Defender;
+        public readonly FightReactionReceiver Reaction;
         public readonly MoveData Move;
         public readonly ulong Attack;
+        public readonly ReactionChoice Choice;
+        public readonly int Remaining;
+        public readonly Vector3 Away;
         public readonly float Damage;
-        public FightActorOutcome(FighterAgent a,ActorSimulation d)
+        public FightActorOutcome(FighterAgent a,ActorSimulation d,FightReactionReceiver reaction,ReactionChoice choice)
         {
-            Attacker=a;Defender=d;Move=a.State.Move;Attack=a.State.AttackId;Damage=a.State.Move.damage;
+            Attacker=a;Defender=d;Reaction=reaction;Move=a.State.Move;Attack=a.State.AttackId;
+            Choice=choice;Remaining=a.State.Remaining;
+            var away=d.transform.position-a.transform.position;away.y=0;
+            Away=away.sqrMagnitude>.0001f?away.normalized:a.transform.forward;
+            Damage=Move.damage+(choice.Situation==HitSituation.Counter?Move.counterDamageBonus:0);
+            // Juggle scaling, the same arithmetic a fighter victim gets: each further hit in the air is
+            // worth less, so a combo on a sniper cannot be worth more than the same combo on a fighter.
+            if(choice.Situation==HitSituation.Airborne)
+                Damage*=Mathf.Max(a.moveSet.minimumAirDamageScale,
+                    a.moveSet.airDamageScale-(reaction!=null?reaction.State.JuggleCost:0)*a.moveSet.airDamageDecay);
         }
-        public bool Valid=>Attacker!=null&&Defender!=null&&Move!=null;
+        public bool Valid=>Attacker!=null&&Defender!=null&&Move!=null&&Choice.Situation!=HitSituation.Miss;
     }
     public static class FightResolver
     {
@@ -60,16 +73,34 @@ namespace DCG.Gameplay.Fighting
             if(height<d.transform.position.y||height>d.transform.position.y+1.8f)return default;
             if(FightPlane.FlatDistance(d.transform.position,a.transform.position)>a.State.Move.range)return default;
             if(Physics.Linecast(a.Actor.AimPoint,d.AimPoint,a.Actor.World.WorldMask,QueryTriggerInteraction.Ignore))return default;
-            return new FightActorOutcome(a,d);
+            // The same selection a fighter victim goes through. With no guard and no crush windows to
+            // report, what is left is the part that makes a combo: counter, air hit and ground hit.
+            var reaction=d.Reaction;
+            var tags=reaction!=null?reaction.Tags:FighterTags.Standing;
+            var choice=HitOutcomeSelector.Select(a.State.Move,tags,a.moveSet.counterStates);
+            return new FightActorOutcome(a,d,reaction,choice);
         }
         public static void ApplyActor(FightActorOutcome o)
         {
             if(!o.Valid)return;
             o.Attacker.State.Contacted=true;
+            var situation=o.Choice.Situation;
+            // A class with no guard cannot reach these, but a receiver that grows tags later might.
+            if(situation==HitSituation.Evaded){o.Attacker.LastResult="Evaded";o.Attacker.LastAdvantage=0;return;}
+            if(situation==HitSituation.Block){o.Attacker.LastResult="Blocked";o.Attacker.LastAdvantage=o.Move.blockOutcome.advantageFrames;return;}
             o.Attacker.Actor.World.Damage.Apply(
                 new DamageRequest(o.Attacker.Actor.Id,o.Defender.Id,o.Attack,o.Damage),o.Defender);
-            o.Attacker.LastResult="Hit";
-            o.Attacker.LastAdvantage=o.Move.hitOutcome.advantageFrames;
+            if(situation==HitSituation.Armor){o.Attacker.LastResult="PowerCrush";o.Attacker.LastAdvantage=0;return;}
+            o.Attacker.LastResult=situation==HitSituation.Counter?"Counter":
+                situation==HitSituation.Airborne?"Air hit":situation==HitSituation.Ground?"Ground hit":"Hit";
+            o.Attacker.LastAdvantage=o.Choice.Hit.advantageFrames;
+            // The hit takes the body: stagger, launch, juggle, knockdown, getup. Without a receiver the
+            // class just takes damage, which is the old behaviour and is not a combo.
+            if(o.Reaction!=null)
+            {
+                o.Reaction.Receive(o.Choice.Hit,o.Remaining,o.Away,situation==HitSituation.Airborne);
+                if(!o.Defender.Health.IsAlive)o.Reaction.Defeat();
+            }
         }
         public static void Apply(FightOutcome o)
         {
