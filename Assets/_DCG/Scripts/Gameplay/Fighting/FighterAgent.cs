@@ -2,12 +2,17 @@ using DCG.Core;
 using UnityEngine;
 namespace DCG.Gameplay.Fighting
 {
-    public sealed class FighterAgent : MonoBehaviour,IActorActionPolicy
+    public sealed class FighterAgent : MonoBehaviour,IActorActionPolicy,ISelfSteppedPolicy
     {
         public FightMoveSet moveSet;
         public bool HoldPosition;
         public ActorSimulation Actor { get; private set; }
+        // The other fighter, when there is one. Null in a fight against a class that is not a fighter.
         public FighterAgent Opponent { get; set; }
+        // What the fighter turns to face and measures forward and back against. Any actor can be it:
+        // this is the near-to-far axis of the fight plane (see FightPlane).
+        public Transform Target { get; set; }
+        public Transform FacingTarget => Target != null ? Target : Opponent != null ? Opponent.transform : null;
         public FightSide Side { get; set; }
         public InputBuffer Buffer { get; }=new InputBuffer();
         public FighterStateMachine State { get; }=new FighterStateMachine();
@@ -86,7 +91,8 @@ namespace DCG.Gameplay.Fighting
                 LastCommand=move==null?"Unassigned "+chord.Buttons:move.command;
                 if(move!=null)State.Start(move);
             }
-            Vector3 facing=Opponent.transform.position-transform.position;facing.y=0;
+            var facingTarget=FacingTarget;
+            Vector3 facing=facingTarget!=null?facingTarget.position-transform.position:transform.forward;facing.y=0;
             if(facing.sqrMagnitude>.0001f)transform.rotation=Quaternion.LookRotation(State.Backturned?-facing:facing);
             var direction=facing.sqrMagnitude>.0001f?facing.normalized:transform.forward;
             Vector3 velocity=Vector3.zero;
@@ -126,7 +132,8 @@ namespace DCG.Gameplay.Fighting
             else Actor.Motor.Step((HoldPosition?Vector3.zero:velocity)+State.StepReaction(Actor.tuning.gravity,1f/60),Actor.tuning.gravity,1f/60);
             input.Pressed=input.Released=0;
         }
-        // FighterMatch owns stepping and resolution; SimulationWorld.AutomaticTicks is disabled in PaulLab.
+        // FighterMatch owns stepping and resolution. The agent is marked ISelfSteppedPolicy, so the world
+        // skips it and the other classes can keep being stepped in the same tick.
         public Vector3 DesiredVelocity(float dt)=>Vector3.zero;
         public void AfterMove(float dt,uint tick){}
         public void Stop(){input=new FightInputFrame{Direction=5};Buffer.Clear();State.Reset();movementFrames=downFrames=upFrames=0;}

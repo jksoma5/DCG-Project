@@ -17,7 +17,15 @@ namespace DCG.Bootstrap.Hub
         public PrototypeTuning common;
         public Material targetMaterial, tracerMaterial, scopeMaterial;
 
+        // A duel places the TRG here, measured from the plaza centre. The line to the fighter runs
+        // north-south, across the map's east-west axis, on purpose: the fight plane is built from the two
+        // participants, so a fight works on any bearing and this proves it.
+        public Vector3 duelSpawnOffset = new Vector3(0, 0, 10);
+
         public override ClassId Id => ClassId.Sniper;
+        // The TRG can stand in as a fighter's opponent: it is an ordinary actor with a hurtbox.
+        public override bool CanBeOpponent => true;
+        public override ActorSimulation PrimaryActor => player;
         public override string DisplayName => "TRG  /  first person sniper loadout";
         public override string Summary => "1 sniper, 2 pistol, 3 knife, RMB scope levels, LMB fire";
 
@@ -40,12 +48,21 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            Vector3 line = Context.Map.laneStart.position;
+            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            // In a duel the TRG faces a class, not a target set: it stands on the plaza, not at the
+            // firing line, and brings nothing to shoot at but the other fighter.
+            Vector3 line = duel
+                ? Context.Map.plazaCenter.position + duelSpawnOffset
+                : Context.Map.laneStart.position;
             player = SpawnActor(line, 0, null);
             sniper = player.GetComponent<SniperController>();
             if (sniper == null) sniper = player.gameObject.AddComponent<SniperController>();
             sniper.tuning = tuning;
-            foreach (var offset in targetOffsets) SpawnActor(line + offset, 1, targetMaterial);
+            if (!duel)
+                foreach (var offset in targetOffsets) SpawnActor(line + offset, 1, targetMaterial);
+            // Standing in for somebody else's opponent: same actor and same simulation, but the camera,
+            // the input and the weapon view models belong to the class being driven.
+            if (!Driven) return;
 
             var host = Context.Camera.gameObject;
             var camera = Context.Camera;
@@ -124,7 +141,7 @@ namespace DCG.Bootstrap.Hub
         // Ported from SniperLabController.LateUpdate.
         public override void LateUpdateView(float deltaTime)
         {
-            if (player == null || !player.Initialized) return;
+            if (!Driven || player == null || !player.Initialized || rig == null) return;
             var tune = sniper.tuning;
             float fov = sniper.ScopeLevel == 2 ? tune.deepScopeFov :
                 sniper.ScopeLevel == 1 ? tune.scopeFov : tune.normalFov;
@@ -142,7 +159,7 @@ namespace DCG.Bootstrap.Hub
 
         public override void DrawHud()
         {
-            if (sniper == null) return;
+            if (!Driven || sniper == null) return;
             GUI.Box(new Rect(20, 20, 425, 145), "FIRST PERSON / SNIPER LOADOUT");
             GUI.Label(new Rect(34, 49, 395, 115),
                 "1 Sniper | 2 Pistol | 3 Knife\nWASD Move | Shift Walk | Ctrl Crouch | Space Jump\nLMB Fire / Slash | RMB Scope / Stab | R Reload\nEsc Class select | Click Capture | F5 Reset\nLane markers every 10 m to 100 m");

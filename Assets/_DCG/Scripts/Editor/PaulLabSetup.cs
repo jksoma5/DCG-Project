@@ -149,6 +149,12 @@ namespace DCG.Editor
             var go=new GameObject(name);go.transform.position=position;go.layer=LayerMask.NameToLayer("CharacterBody");
             var cc=go.AddComponent<CharacterController>();cc.height=1.8f;cc.center=Vector3.up*.9f;cc.radius=.3f;cc.skinWidth=.025f;
             go.AddComponent<CharacterMotor>();var actor=go.AddComponent<ActorSimulation>();actor.actorNumber=id;actor.classId=ClassId.Paul;actor.tuning=common;
+            // A fighter has to be shootable now that a fight can be against the gun classes: bullets
+            // look for the Hurtbox layer, and the character controller is on CharacterBody.
+            var hurt=new GameObject("Hurtbox");hurt.transform.SetParent(go.transform,false);
+            hurt.layer=LayerMask.NameToLayer("Hurtbox");
+            var capsule=hurt.AddComponent<CapsuleCollider>();capsule.height=1.8f;capsule.radius=.36f;
+            capsule.center=new Vector3(0,.9f,0);capsule.isTrigger=true;
             var fighter=go.AddComponent<FighterAgent>();fighter.moveSet=moves;
             var view=go.AddComponent<FighterView>();view.fighter=fighter;
             view.body=Part(go.transform,"Body",new Vector3(.65f,1.8f,.55f),material);

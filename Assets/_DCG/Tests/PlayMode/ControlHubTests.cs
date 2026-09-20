@@ -60,7 +60,9 @@ namespace DCG.Tests
             Assert.That(Count<GravesInputReader>(), Is.EqualTo(1));
             Assert.That(Count<VendettaInputReader>(), Is.Zero);
             Assert.That(Count<DebugOverlay>(), Is.EqualTo(1));
-            Assert.That(hub.world.AutomaticTicks, Is.True);
+            // The hub steps the world itself, so that a fight frame and the world step keep a fixed
+            // order even when two classes are live.
+            Assert.That(hub.world.AutomaticTicks, Is.False);
             Assert.That(hub.CursorMode, Is.EqualTo(HubCursorMode.Free), "Graves points with a free cursor.");
             int actors = hub.world.Actors.Count;
             Assert.That(actors, Is.GreaterThan(1), "Graves needs a player and at least one target.");
@@ -294,6 +296,7 @@ namespace DCG.Tests
             var paul = (PaulModule)hub.ActiveModule;
             Assert.That(paul.Match, Is.Not.Null);
             Assert.That(hub.world.AutomaticTicks, Is.False, "The hub drives the fighting loop itself.");
+            Assert.That(paul.Match.second, Is.Not.Null, "Practising alone still puts a dummy on the stage.");
             Assert.That(hub.world.Actors.Count, Is.EqualTo(2), "A fight is always two fighters.");
 
             // Facing positions straddle the plaza centre along X, so screen right is east (doc 12, 1-1).
@@ -311,23 +314,24 @@ namespace DCG.Tests
             Assert.That(advanced, Is.InRange(25, 35), "The match advanced " + advanced + " frames in 30 ticks.");
         }
 
-        [UnityTest] public IEnumerator LeavingPaulGivesTheTickPolicyAndInputModeBack()
+        // The hub owns the tick and the input update mode for the whole session, so leaving Paul is no
+        // longer a handover: it is just a class ending. What has to hold is that the world keeps
+        // advancing for whoever comes next (doc 14, conflict 3).
+        [UnityTest] public IEnumerator LeavingPaulLeavesTheWorldAdvancingForTheNextClass()
         {
-            var modeBefore = UnityEngine.InputSystem.InputSystem.settings.updateMode;
+            var mode = UnityEngine.InputSystem.InputSystem.settings.updateMode;
+            Assert.That(mode, Is.EqualTo(UnityEngine.InputSystem.InputSettings.UpdateMode.ProcessEventsManually),
+                "The hub processes input events itself so a fight frame can sample them.");
 
             hub.Select(ClassId.Paul);
             yield return null;
-            Assert.That(hub.world.AutomaticTicks, Is.False);
             Assert.That(Count<FighterInputReader>(), Is.EqualTo(1));
 
-            // The class that follows must tick normally again. This is conflict 3 in doc 14: the lab's
-            // FighterMatch.Initialize turned automatic ticks off globally and never turned them back on.
             hub.Select(ClassId.Rifle);
             yield return null;
-            Assert.That(hub.world.AutomaticTicks, Is.True, "Paul left the world switched off.");
             Assert.That(Count<FighterInputReader>(), Is.Zero);
-            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(modeBefore),
-                "Paul's manual input update mode leaked into another class.");
+            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(mode),
+                "A class must not take the input update mode from the hub.");
 
             uint tick = hub.world.Tick;
             for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
@@ -335,7 +339,7 @@ namespace DCG.Tests
 
             hub.ShowSelect();
             yield return null;
-            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(modeBefore));
+            Assert.That(UnityEngine.InputSystem.InputSystem.settings.updateMode, Is.EqualTo(mode));
         }
 
         [UnityTest] public IEnumerator ComingBackToPaulStartsHisFramesOverCleanly()
@@ -419,6 +423,89 @@ namespace DCG.Tests
                 foreach (var map in asset.actionMaps)
                     if (map.enabled) names.Add(map.name);
             return names;
+        }
+
+        // The goal of doc 14 section 11: two classes from different games alive in the same space, one
+        // driven and one standing in as its opponent.
+        [UnityTest] public IEnumerator PaulAndTheTrgFightInOneSpace()
+        {
+            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Sniper), Is.True);
+            yield return null;
+            var paul = (PaulModule)hub.ActiveModule;
+            Assert.That(hub.OpponentModule, Is.Not.Null);
+            Assert.That(hub.OpponentModule.Id, Is.EqualTo(ClassId.Sniper));
+
+            // Both actors are live in one world, and neither brings a practice target of its own.
+            Assert.That(hub.world.Actors.Count, Is.EqualTo(2), "A duel is two actors, no target sets.");
+            Assert.That(paul.Match.second, Is.Null, "The far side is not a fighter.");
+            Assert.That(paul.Match.opponentActor, Is.EqualTo(hub.OpponentModule.PrimaryActor));
+
+            // Only the driven class has a camera rig, an input reader and a HUD.
+            Assert.That(Count<FighterInputReader>(), Is.EqualTo(1));
+            Assert.That(Count<SniperInputReader>(), Is.Zero, "The opponent is not being driven.");
+            Assert.That(Count<FirstPersonScopeRig>(), Is.Zero);
+            Assert.That(Count<FightCameraRig>(), Is.EqualTo(1));
+            Assert.That(Count<Camera>(), Is.EqualTo(1));
+
+            // The plane runs between the two, on the bearing they happen to be on - here north-south,
+            // across the map's east-west axis.
+            Vector3 between = hub.OpponentModule.PrimaryActor.transform.position - paul.Match.first.transform.position;
+            between.y = 0;
+            Assert.That(Vector3.Dot(paul.Match.Plane.Axis, between.normalized), Is.GreaterThan(.95f));
+
+            // The fight loop and the world step both run, in one tick, without either side being
+            // stepped twice: the fighter advances his own frames, the TRG is stepped by the world.
+            int frame = paul.Match.Frame;
+            uint tick = hub.world.Tick;
+            float groundedY = hub.OpponentModule.PrimaryActor.transform.position.y;
+            for (int step = 0; step < 30; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Match.Frame - frame, Is.InRange(25, 35), "The fight frames stopped.");
+            Assert.That(hub.world.Tick - tick, Is.InRange(25u, 35u), "The world stopped.");
+            Assert.That(hub.OpponentModule.PrimaryActor.transform.position.y,
+                Is.EqualTo(groundedY).Within(.05f), "The opponent should be standing, not sinking.");
+            Assert.That(paul.Match.first.transform.position.y, Is.EqualTo(0).Within(.2f),
+                "A fighter stepped twice in one tick falls through his own gravity.");
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(Count<ActorSimulation>(), Is.Zero, "Leaving a duel must remove both sides.");
+            Assert.That(Count<FightCameraRig>(), Is.Zero);
+        }
+
+        [UnityTest] public IEnumerator DrivingTheTrgAgainstPaulIsTheSameSpaceTheOtherWayRound()
+        {
+            Assert.That(hub.SelectDuel(ClassId.Sniper, ClassId.Paul), Is.True);
+            yield return null;
+            Assert.That(hub.ActiveModule.Id, Is.EqualTo(ClassId.Sniper));
+            Assert.That(hub.OpponentModule.Id, Is.EqualTo(ClassId.Paul));
+            Assert.That(hub.world.Actors.Count, Is.EqualTo(2));
+
+            // The TRG is driven, so it owns the camera and the input; Paul stands in without either but
+            // keeps his own frame loop running.
+            Assert.That(Count<SniperInputReader>(), Is.EqualTo(1));
+            Assert.That(Count<FighterInputReader>(), Is.Zero);
+            Assert.That(Count<FirstPersonScopeRig>(), Is.EqualTo(1));
+            Assert.That(Count<FightCameraRig>(), Is.Zero);
+
+            var paul = (PaulModule)hub.OpponentModule;
+            int frame = paul.Match.Frame;
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Match.Frame - frame, Is.GreaterThan(10),
+                "A standing fighter still needs his frames, or he cannot fall or react.");
+            // He is shootable: the gun classes look for a hurtbox.
+            var hurtbox = paul.Match.first.transform.Find("Hurtbox");
+            Assert.That(hurtbox, Is.Not.Null, "A fighter must have a hurtbox to be shot at.");
+            Assert.That(hurtbox.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("Hurtbox")));
+        }
+
+        [UnityTest] public IEnumerator ClassesThatCannotStandInAsOpponentsAreRefused()
+        {
+            // Only the classes prepared for it can be an opponent yet; the hub says no rather than
+            // building a half-live class.
+            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Graves), Is.False);
+            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Paul), Is.False);
+            Assert.That(hub.Selecting, Is.True, "A refused duel must not start anything.");
+            yield return null;
         }
 
         ActorSimulation PlayerOf(int team)

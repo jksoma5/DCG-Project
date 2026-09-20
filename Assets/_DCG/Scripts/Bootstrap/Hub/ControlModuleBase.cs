@@ -16,6 +16,10 @@ namespace DCG.Bootstrap.Hub
         public virtual HubCursorMode RequiredCursor => HubCursorMode.Locked;
         public virtual TickPolicy RequiredTick => TickPolicy.Automatic;
         public bool Active { get; private set; }
+        public HubRole Role { get; private set; }
+        public virtual bool CanBeOpponent => false;
+        public virtual ActorSimulation PrimaryActor => null;
+        protected bool Driven => Role == HubRole.Controlled;
 
         protected HubContext Context { get; private set; }
         readonly List<GameObject> spawned = new List<GameObject>();
@@ -23,13 +27,21 @@ namespace DCG.Bootstrap.Hub
         readonly List<Component> attached = new List<Component>();
         readonly List<GameObject> deferred = new List<GameObject>();
 
-        public void Activate(HubContext context)
+        public void Activate(HubContext context) => Activate(context, HubRole.Controlled);
+
+        public void Activate(HubContext context, HubRole role)
         {
             if (Active) return;
+            if (role == HubRole.Opponent && !CanBeOpponent)
+                throw new System.InvalidOperationException(
+                    DisplayName + " cannot stand in as an opponent yet.");
             Context = context;
+            Role = role;
             Active = true;
             OnActivate();
         }
+
+        public virtual void SetOpponent(IControlModule opponent) { }
 
         public void Deactivate()
         {
@@ -62,6 +74,7 @@ namespace DCG.Bootstrap.Hub
                 if (spawned[i] != null) Destroy(spawned[i]);
             spawned.Clear();
             Active = false;
+            Role = HubRole.Controlled;
             Context = null;
         }
 

@@ -6,6 +6,11 @@ namespace DCG.Classes.Paul
     public sealed class FighterInputReader : MonoBehaviour
     {
         public InputActionAsset controls;
+        // The reader normally switches the Input System to manual event processing for as long as it
+        // lives. When something bigger owns that decision for a whole session - the control hub does,
+        // because a fight now runs beside the other classes - it sets this to false and the reader
+        // leaves the global mode alone.
+        public bool ownsUpdateMode=true;
         public FightInputTimeline Timeline { get; }=new FightInputTimeline();
         InputActionAsset runtime;
         InputActionMap map;
@@ -16,7 +21,8 @@ namespace DCG.Classes.Paul
         {
             // No asset, nothing to bind - and in particular the global update mode is left alone.
             if(controls==null)return;
-            previous=InputSystem.settings.updateMode;InputSystem.settings.updateMode=InputSettings.UpdateMode.ProcessEventsManually;
+            previous=InputSystem.settings.updateMode;
+            if(ownsUpdateMode)InputSystem.settings.updateMode=InputSettings.UpdateMode.ProcessEventsManually;
             runtime=Instantiate(controls);map=runtime.FindActionMap("Fighter",true);
             string[] names={"Left","Right","Up","Down","LP","RP","LK","RK","BothHands","BothFeet"};
             for(int i=0;i<names.Length;i++)
@@ -35,7 +41,9 @@ namespace DCG.Classes.Paul
         {
             if(!bound)return;
             if(runtime!=null){runtime.Disable();Destroy(runtime);}
-            map=null;Timeline.Clear();InputSystem.settings.updateMode=previous;bound=false;
+            map=null;Timeline.Clear();
+            if(ownsUpdateMode)InputSystem.settings.updateMode=previous;
+            bound=false;
         }
     }
 }

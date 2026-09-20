@@ -20,6 +20,23 @@ namespace DCG.Gameplay.Fighting
         }
         public bool Valid=>Move!=null&&Choice.Situation!=HitSituation.Miss;
     }
+    // A move landing on a class that is not a fighter. The other three classes have no guard, no side
+    // and no fighter state machine, so everything about defending is absent and the hit simply lands.
+    // The contact rules are the fighters' own: attack level against the target's height, the move's
+    // range measured flat in the fight plane, and line of sight.
+    public readonly struct FightActorOutcome
+    {
+        public readonly FighterAgent Attacker;
+        public readonly ActorSimulation Defender;
+        public readonly MoveData Move;
+        public readonly ulong Attack;
+        public readonly float Damage;
+        public FightActorOutcome(FighterAgent a,ActorSimulation d)
+        {
+            Attacker=a;Defender=d;Move=a.State.Move;Attack=a.State.AttackId;Damage=a.State.Move.damage;
+        }
+        public bool Valid=>Attacker!=null&&Defender!=null&&Move!=null;
+    }
     public static class FightResolver
     {
         public static FightOutcome Evaluate(FighterAgent a,FighterAgent d)
@@ -32,6 +49,27 @@ namespace DCG.Gameplay.Fighting
             if(delta.magnitude>a.State.Move.range||Physics.Linecast(a.Actor.AimPoint,d.Actor.AimPoint,a.Actor.World.WorldMask,QueryTriggerInteraction.Ignore))return default;
             var choice=HitOutcomeSelector.Select(a.State.Move,d.Tags,a.moveSet.counterStates);
             return new FightOutcome(a,d,choice);
+        }
+        public static FightActorOutcome EvaluateActor(FighterAgent a,ActorSimulation d)
+        {
+            if(a==null||d==null||!d.Initialized)return default;
+            if(!a.Actor.Health.IsAlive||!d.Health.IsAlive||!a.State.Active||a.State.Contacted)return default;
+            float height=a.transform.position.y+(a.State.Move.level==HitLevel.High?1.4f:a.State.Move.level==HitLevel.Low?.3f:1f);
+            // A target off the ground is only reachable where its body actually is. A three dimensional
+            // class jumps and falls on its own, so this is checked for everyone, not only for a juggle.
+            if(height<d.transform.position.y||height>d.transform.position.y+1.8f)return default;
+            if(FightPlane.FlatDistance(d.transform.position,a.transform.position)>a.State.Move.range)return default;
+            if(Physics.Linecast(a.Actor.AimPoint,d.AimPoint,a.Actor.World.WorldMask,QueryTriggerInteraction.Ignore))return default;
+            return new FightActorOutcome(a,d);
+        }
+        public static void ApplyActor(FightActorOutcome o)
+        {
+            if(!o.Valid)return;
+            o.Attacker.State.Contacted=true;
+            o.Attacker.Actor.World.Damage.Apply(
+                new DamageRequest(o.Attacker.Actor.Id,o.Defender.Id,o.Attack,o.Damage),o.Defender);
+            o.Attacker.LastResult="Hit";
+            o.Attacker.LastAdvantage=o.Move.hitOutcome.advantageFrames;
         }
         public static void Apply(FightOutcome o)
         {

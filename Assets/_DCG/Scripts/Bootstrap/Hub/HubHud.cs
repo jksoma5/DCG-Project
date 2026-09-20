@@ -16,8 +16,9 @@ namespace DCG.Bootstrap.Hub
                 bar.normal.textColor = new Color(.32f, .92f, .78f);
             }
             hub.ActiveModule?.DrawHud();
+            string against = hub.OpponentModule != null ? "  vs  " + hub.OpponentModule.Id : string.Empty;
             GUI.Label(new Rect(Screen.width - 345, Screen.height - 48, 320, 20),
-                hub.ActiveModule?.DisplayName + "   /   Esc  class select   /   F5  reset", bar);
+                hub.ActiveModule?.Id + against + "   /   Esc  class select   /   F5  reset", bar);
             // A mouse path out of a class, not only the key. Classes that capture the cursor make the
             // key the natural exit, but a button is what can be verified without keyboard focus and is
             // what a viewer reaches for first.

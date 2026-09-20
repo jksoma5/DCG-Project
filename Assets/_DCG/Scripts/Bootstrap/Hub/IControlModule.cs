@@ -9,6 +9,12 @@ namespace DCG.Bootstrap.Hub
     // HubDriven: the module steps the world itself (the fighting loop needs both actors advanced together).
     public enum TickPolicy { Automatic, HubDriven }
 
+    // Why a class is in the scene.
+    // Controlled: the player is driving it, so it gets the camera, the input reader and the HUD.
+    // Opponent: it stands in the same space as somebody else's opponent. Same actor, same simulation,
+    // but no camera, no input and no HUD - those belong to the class being driven.
+    public enum HubRole { Controlled, Opponent }
+
     // Cursor state this module needs. Graves points at the world with a free cursor;
     // the first and third person classes capture it.
     public enum HubCursorMode { Free, Locked }
@@ -57,8 +63,15 @@ namespace DCG.Bootstrap.Hub
         HubCursorMode RequiredCursor { get; }
         TickPolicy RequiredTick { get; }
         bool Active { get; }
+        HubRole Role { get; }
+        // Whether this class can stand in as somebody else's opponent.
+        bool CanBeOpponent { get; }
+        // The actor the class is playing as, which is what an opponent aims at or closes in on.
+        ActorSimulation PrimaryActor { get; }
 
-        void Activate(HubContext context);
+        void Activate(HubContext context, HubRole role);
+        // Called by the hub once both sides of a duel exist.
+        void SetOpponent(IControlModule opponent);
         void Deactivate();
         void ResetState();
         void TickFixed();

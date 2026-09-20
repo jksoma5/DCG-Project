@@ -160,14 +160,42 @@ namespace DCG.Tests
             Tick(5,FightButtons.LP,5,FightButtons.LP);Run(12);
             Assert.That(a.Actor.Health.Current,Is.Zero);Assert.That(b.Actor.Health.Current,Is.Zero);
         }
-        [Test] public void SideWaitsDuringAttackButFacingTracksAndThenFlips()
+        // The fight plane is built from the two fighters, not from the map's east-west line, so swapping
+        // places turns the plane around instead of mirroring the controls. The camera turns with it, so
+        // the player's forward stays on the same side of the screen and Side never changes.
+        [Test] public void PlaneTurnsWithThePairAndTheControlsNeverMirror()
         {
             Tick(5,FightButtons.LP);Run(2);
             var ca=a.GetComponent<CharacterController>();var cb=b.GetComponent<CharacterController>();
             ca.enabled=cb.enabled=false;a.transform.position=new Vector3(1,0,0);b.transform.position=new Vector3(-1,0,0);
             ca.enabled=cb.enabled=true;Physics.SyncTransforms();Tick();
-            Assert.That(a.Side,Is.EqualTo(FightSide.Normal));Assert.That(Vector3.Dot(a.transform.forward,Vector3.left),Is.GreaterThan(.99f));
-            Run(35);Assert.That(a.Side,Is.EqualTo(FightSide.Reversed));Assert.That(b.Side,Is.EqualTo(FightSide.Normal));
+            // Mid-move the plane is frozen (CanChangeSide), but facing still tracks the opponent.
+            Assert.That(a.Side,Is.EqualTo(FightSide.Normal));
+            Assert.That(Vector3.Dot(a.transform.forward,Vector3.left),Is.GreaterThan(.99f));
+            Run(35);
+            Assert.That(a.Side,Is.EqualTo(FightSide.Normal),"the near side of the plane is never mirrored");
+            Assert.That(b.Side,Is.EqualTo(FightSide.Reversed));
+            // The axis turned around with them: it always runs from the near fighter to the far one.
+            Vector3 expected=(b.transform.position-a.transform.position);expected.y=0;
+            Assert.That(Vector3.Dot(match.Plane.Axis,expected.normalized),Is.GreaterThan(.99f));
+            Assert.That(Vector3.Dot(a.transform.forward,Vector3.left),Is.GreaterThan(.99f));
+        }
+
+        // A fight on a bearing that has nothing to do with the map axis, which is what fighting a class
+        // that moves in three dimensions looks like.
+        [Test] public void PlaneWorksOnAnyBearing()
+        {
+            var ca=a.GetComponent<CharacterController>();var cb=b.GetComponent<CharacterController>();
+            ca.enabled=cb.enabled=false;
+            a.transform.position=new Vector3(0,0,-1);b.transform.position=new Vector3(0,0,1);
+            ca.enabled=cb.enabled=true;Physics.SyncTransforms();Run(3);
+            Assert.That(Vector3.Dot(match.Plane.Axis,Vector3.forward),Is.GreaterThan(.99f),
+                "the axis follows the pair, here north-south");
+            // Screen right is the axis, so the camera has to stand on the axis's horizontal perpendicular.
+            Assert.That(Vector3.Dot(match.Plane.Normal,Vector3.right),Is.GreaterThan(.99f));
+            Assert.That(a.Side,Is.EqualTo(FightSide.Normal));
+            Assert.That(Vector3.Dot(a.transform.forward,Vector3.forward),Is.GreaterThan(.99f),
+                "the fighter turns to face whoever he is fighting");
         }
         [Test] public void MacrosDoNotBecomeSinglePunchAndInputSettingsRestore()
         {

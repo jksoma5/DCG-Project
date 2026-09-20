@@ -19,7 +19,15 @@ namespace DCG.Bootstrap.Hub
         public FightMoveSet moves;
         public Material playerMaterial, dummyMaterial;
 
+        // Where the fighter stands in a duel, measured from the plaza centre.
+        public Vector3 duelSpawnOffset = Vector3.zero;
+
         public override ClassId Id => ClassId.Paul;
+        // A fighter can stand in as somebody else's opponent: he keeps his own frame loop, so he still
+        // falls, reacts and gets up while another class is the one being played.
+        public override bool CanBeOpponent => true;
+        public override ActorSimulation PrimaryActor => first != null ? first.Actor : null;
+        public FighterAgent Fighter => first;
         public override string DisplayName => "PAUL  /  fighting game input";
         public override string Summary => "WASD direction, U I LP RP, J K LK RK, F1-F4 dummy, F6 record, F7 replay";
         // Keyboard only, and the frame display has to stay readable: the cursor is never captured.
@@ -45,8 +53,14 @@ namespace DCG.Bootstrap.Hub
             // The stage axis is the map's east-west axis, so the camera looking north from the south
             // puts east on the right of the screen (doc 12, 1-1). These two anchors are the only
             // positions the class needs from the map.
-            first = SpawnFighter("Paul prototype", Context.Map.fightWest.position, 0, playerMaterial);
-            second = SpawnFighter("Practice dummy", Context.Map.fightEast.position, 1, dummyMaterial);
+            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            first = SpawnFighter("Paul prototype",
+                duel ? Context.Map.plazaCenter.position + duelSpawnOffset : Context.Map.fightWest.position,
+                0, playerMaterial);
+            // The practice dummy exists for solo practice only. In a duel the far side of the plane is
+            // the other class, and it is linked in by SetOpponent once both actors exist.
+            second = duel ? null
+                : SpawnFighter("Practice dummy", Context.Map.fightEast.position, 1, dummyMaterial);
 
             var matchHost = Track(new GameObject("Paul match"));
             Match = matchHost.AddComponent<FighterMatch>();
@@ -54,22 +68,37 @@ namespace DCG.Bootstrap.Hub
             // Not Initialize(): that one registers the two actors itself and takes the world's tick
             // policy with it (doc 14, conflict 3). The hub already registered them with hub-issued ids
             // and already owns the tick policy, so only the agents are initialized here.
-            Match.InitializeAgents();
-
-            var host = Context.Camera.gameObject;
-            Context.Camera.nearClipPlane = .05f;
-            rig = Attach<FightCameraRig>(host);
-            rig.first = first.transform; rig.second = second.transform; rig.viewCamera = Context.Camera;
-
-            // The reader switches the Input System to manual event processing in OnEnable and restores
-            // the previous mode in OnDisable. Attaching and detaching it per class is what makes that
-            // save and restore the module switching contract (doc 14, section 3).
-            input = AttachDeferred<FighterInputReader>("Paul input",
-                reader => reader.controls = Context.Hub.controls);
+            if (second != null) Match.InitializeAgents();
+            else first.Initialize();   // the far side arrives with SetOpponent
 
             tape.Clear();
             Recording = false; replayIndex = 0; DummyMode = FightDummyMode.Idle;
             sampleTime = Time.realtimeSinceStartupAsDouble;
+            if (!Driven) return;
+
+            var host = Context.Camera.gameObject;
+            Context.Camera.nearClipPlane = .05f;
+            rig = Attach<FightCameraRig>(host);
+            rig.first = first.transform; rig.second = Match.DefenderTransform; rig.viewCamera = Context.Camera;
+
+            // The reader switches the Input System to manual event processing in OnEnable and restores
+            // the previous mode in OnDisable. Attaching and detaching it per class is what makes that
+            // save and restore the module switching contract (doc 14, section 3).
+            input = AttachDeferred<FighterInputReader>("Paul input", reader => {
+                reader.controls = Context.Hub.controls;
+                // The hub owns the input update mode for the whole session now, because a fight runs
+                // beside the other classes and the mode cannot belong to one class any more.
+                reader.ownsUpdateMode = false;
+            });
+        }
+
+        // Both sides of a duel exist by now, so the plane gets its far end and the camera follows it.
+        public override void SetOpponent(IControlModule opponent)
+        {
+            if (Match == null || opponent == null) return;
+            var otherFighter = opponent as PaulModule;
+            Match.SetOpponent(otherFighter != null ? otherFighter.Fighter : null, opponent.PrimaryActor);
+            if (rig != null) rig.second = Match.DefenderTransform;
         }
 
         protected override void OnDeactivate()
@@ -113,7 +142,10 @@ namespace DCG.Bootstrap.Hub
         // fighting system is written for, so a fixed tick and a fight frame are the same thing here.
         public override void TickFixed()
         {
-            if (Match == null || input == null) return;
+            if (Match == null || Match.DefenderTransform == null) return;
+            // Standing in as an opponent: the frame loop still runs, so he falls, takes reactions and
+            // gets up, but no input arrives and no dummy behaviour is driven.
+            if (input == null) { Tick(new FightInputFrame { Direction = 5 }); return; }
             sampleTime += FrameClock.StepSeconds;
             input.Poll();
             if (input.Pressed("Reset")) { ResetState(); return; }
@@ -142,6 +174,13 @@ namespace DCG.Bootstrap.Hub
                 saved.Direction = FightDirections.Relative(saved.Direction, Match.first.Side);
                 tape.Add(saved);
             }
+            // No practice dummy in a duel: the far side is a live class driving itself.
+            if (Match.second == null)
+            {
+                Send(Match.first, player);
+                Match.StepFrame();
+                return;
+            }
             var dummy = new FightInputFrame { Direction = 5 };
             Match.second.HoldPosition = DummyMode != FightDummyMode.Replay;
             if (DummyMode == FightDummyMode.AllGuard)
@@ -166,19 +205,22 @@ namespace DCG.Bootstrap.Hub
 
         public override void DrawHud()
         {
-            if (Match == null || Match.first == null || Match.first.Actor == null) return;
+            if (!Driven || Match == null || Match.first == null || Match.first.Actor == null) return;
             GUI.Box(new Rect(20, 20, 500, 150), "PAUL / TEKKEN 7 INPUT / 60 Hz hub tick");
             GUI.Label(new Rect(34, 48, 470, 115),
                 "WASD Direction | U/I LP/RP | J/K LK/RK\nO Both hands | L Both feet | S, S+D, D+I Phoenix\nF1 Idle | F2 All guard | F3 Crouch guard | F4 Jab\nF5 Reset | F6 Record player | F7 Replay on dummy\nPrototype moves / no Heat, Rage, throws or air combos");
             GUI.Label(new Rect(Screen.width - 280, 20, 265, 100), "FRAME " + Match.Frame + " / " + DummyMode +
                 "\n" + (Recording ? "REC " : "TAPE ") + tape.Count + " frames\n" +
-                Match.first.Actor.Health.Current + " HP  vs  " + Match.second.Actor.Health.Current + " HP");
+                Match.first.Actor.Health.Current + " HP  vs  " +
+                (Match.Defender != null ? Match.Defender.Health.Current.ToString("0") : "-") + " HP");
             var a = Match.first;
             GUI.Box(new Rect(20, Screen.height - 125, 600, 105), string.Empty);
             GUI.Label(new Rect(34, Screen.height - 115, 570, 95), a.Side + " | " + a.State.Phase + " | " + a.LastCommand +
                 "\n" + a.LastResult + " | advantage " + a.LastAdvantage + "f | move frame " + a.State.Age +
                 " | stun " + a.State.Stun +
-                "\nDefender: " + Match.second.State.Phase + " | juggle " + Match.second.State.JuggleCost +
+                "\nDefender: " + (Match.second != null
+                    ? Match.second.State.Phase + " | juggle " + Match.second.State.JuggleCost
+                    : "not a fighter") +
                 "\nInput: " + History(a));
         }
 

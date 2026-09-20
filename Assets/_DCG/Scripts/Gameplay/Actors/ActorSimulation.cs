@@ -39,6 +39,9 @@ namespace DCG.Gameplay
         public void Step(float dt, uint tick)
         {
             if (!Health.IsAlive) return;
+            // A fighter advances itself on its own frame loop; stepping it here too would double its
+            // gravity and movement in the same tick.
+            if (Movement is ISelfSteppedPolicy) return;
             Vector3 desired = Movement?.DesiredVelocity(dt) ?? Vector3.zero;
             if (Movement is IActorActionPolicy policy)
             {
