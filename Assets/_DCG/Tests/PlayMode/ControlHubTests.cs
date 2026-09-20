@@ -508,6 +508,68 @@ namespace DCG.Tests
             yield return null;
         }
 
+        // Every class that has been opened as an opponent must behave the same way in a duel: one actor
+        // each, no practice targets, and everything to do with being played belonging to the driven side.
+        [UnityTest] public IEnumerator EveryOpenedOpponentFightsTheFighterTheSameWay()
+        {
+            foreach (var id in new[] { ClassId.Sniper, ClassId.Rifle, ClassId.Vendetta })
+            {
+                Assert.That(hub.SelectDuel(ClassId.Paul, id), Is.True, id + " cannot stand in yet.");
+                yield return null;
+                var paul = (PaulModule)hub.ActiveModule;
+                Assert.That(hub.OpponentModule.Id, Is.EqualTo(id));
+                Assert.That(hub.world.Actors.Count, Is.EqualTo(2), id + " brought more than itself.");
+                Assert.That(paul.Match.opponentActor, Is.EqualTo(hub.OpponentModule.PrimaryActor));
+                Assert.That(Count<Camera>(), Is.EqualTo(1));
+                Assert.That(Count<FighterInputReader>(), Is.EqualTo(1), "Only the driven class reads input.");
+                Assert.That(Count<RifleInputReader>() + Count<SniperInputReader>() +
+                    Count<VendettaInputReader>(), Is.Zero, id + " is not being driven.");
+
+                // The plane finds whatever bearing the two ended up on.
+                Vector3 between = hub.OpponentModule.PrimaryActor.transform.position -
+                    paul.Match.first.transform.position;
+                between.y = 0;
+                Assert.That(Vector3.Dot(paul.Match.Plane.Axis, between.normalized), Is.GreaterThan(.95f));
+
+                int frame = paul.Match.Frame;
+                uint tick = hub.world.Tick;
+                for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+                Assert.That(paul.Match.Frame - frame, Is.GreaterThan(10), "Fight frames stopped for " + id);
+                Assert.That(hub.world.Tick - tick, Is.GreaterThan(10u), "The world stopped for " + id);
+                Assert.That(hub.OpponentModule.PrimaryActor.Health.IsAlive, Is.True);
+            }
+
+            hub.ShowSelect();
+            yield return null;
+            Assert.That(Count<ActorSimulation>(), Is.Zero);
+            Assert.That(hub.hubCamera.transform.childCount, Is.Zero,
+                "An opponent must not leave view models on the shared camera.");
+        }
+
+        // The other way round: the opened classes are playable while a fighter stands in for them.
+        [UnityTest] public IEnumerator OpenedClassesCanAlsoBeTheDrivenSideAgainstTheFighter()
+        {
+            Assert.That(hub.SelectDuel(ClassId.Rifle, ClassId.Paul), Is.True);
+            yield return null;
+            Assert.That(Count<RifleInputReader>(), Is.EqualTo(1));
+            Assert.That(Count<ShoulderCameraRig>(), Is.EqualTo(1));
+            Assert.That(Count<FightCameraRig>(), Is.Zero, "The fighter is not the one being played.");
+            Assert.That(hub.world.Actors.Count, Is.EqualTo(2));
+
+            Assert.That(hub.SelectDuel(ClassId.Vendetta, ClassId.Paul), Is.True);
+            yield return null;
+            Assert.That(Count<VendettaInputReader>(), Is.EqualTo(1));
+            Assert.That(Count<RifleInputReader>(), Is.Zero, "The previous duel must be gone.");
+            Assert.That(Count<ThirdPersonRig>(), Is.EqualTo(1));
+            Assert.That(hub.world.Actors.Count, Is.EqualTo(2));
+
+            // The standing fighter keeps his own frame loop either way.
+            var paul = (PaulModule)hub.OpponentModule;
+            int frame = paul.Match.Frame;
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(paul.Match.Frame - frame, Is.GreaterThan(10));
+        }
+
         ActorSimulation PlayerOf(int team)
         {
             foreach (var actor in hub.world.Actors) if (actor.team == team) return actor;

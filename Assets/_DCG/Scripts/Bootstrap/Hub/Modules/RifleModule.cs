@@ -16,7 +16,14 @@ namespace DCG.Bootstrap.Hub
         public PrototypeTuning common;
         public Material targetMaterial, tracerMaterial;
 
+        // Where the M416 stands in a duel, measured from the plaza centre. Mid range: close enough that
+        // a fighter can reach it and far enough that shoulder aim and ADS both have something to do.
+        public Vector3 duelSpawnOffset = new Vector3(0, 0, 7);
+
         public override ClassId Id => ClassId.Rifle;
+        // The M416 can stand in as another class's opponent: an ordinary actor with a hurtbox.
+        public override bool CanBeOpponent => true;
+        public override ActorSimulation PrimaryActor => player;
         public override string DisplayName => "M416  /  shoulder aim and ADS";
         public override string Summary => "WASD move, C crouch, Z prone, Q E lean, RMB shoulder or ADS, B fire mode";
 
@@ -36,15 +43,26 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            Vector3 line = Context.Map.laneStart.position;
+            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            // In a duel the M416 faces a class, not a target set, so it stands on the plaza rather than
+            // at the lane firing line.
+            Vector3 line = duel
+                ? Context.Map.plazaCenter.position + duelSpawnOffset
+                : Context.Map.laneStart.position;
             player = SpawnActor(line, 0, null);
             rifle = player.GetComponent<RifleController>();
             if (rifle == null) rifle = player.gameObject.AddComponent<RifleController>();
             rifle.tuning = tuning;
             model = player.transform.Find("Body");
             gun = player.transform.Find("M416 placeholder");
-            foreach (var offset in targetOffsets) SpawnActor(line + offset, 1, targetMaterial);
-            SpawnActor(line + coveredTargetOffset, 1, targetMaterial);
+            if (!duel)
+            {
+                foreach (var offset in targetOffsets) SpawnActor(line + offset, 1, targetMaterial);
+                SpawnActor(line + coveredTargetOffset, 1, targetMaterial);
+            }
+            // Standing in for somebody else's opponent: same actor and same simulation, but the camera,
+            // the input and the weapon view models belong to the class being driven.
+            if (!Driven) return;
 
             var host = Context.Camera.gameObject;
             var camera = Context.Camera;
@@ -119,7 +137,7 @@ namespace DCG.Bootstrap.Hub
         // still placed after the actor has moved, exactly as it was in the lab.
         public override void LateUpdateView(float deltaTime)
         {
-            if (player == null || !player.Initialized) return;
+            if (!Driven || player == null || !player.Initialized || rig == null) return;
             var tune = rifle.tuning;
             bool ads = rifle.AimMode == RifleAimMode.Ads;
             bool aim = rifle.AimMode == RifleAimMode.Shoulder;
@@ -143,7 +161,7 @@ namespace DCG.Bootstrap.Hub
 
         public override void DrawHud()
         {
-            if (rifle == null) return;
+            if (!Driven || rifle == null) return;
             GUI.Box(new Rect(20, 20, 410, 174), "M416 / SHOULDER + ADS");
             GUI.Label(new Rect(34, 48, 390, 140),
                 "WASD Move | Shift Sprint | Ctrl Walk | Space Jump\nC Crouch | Z Prone | Q / E Lean + shoulder\nLMB Fire | RMB hold Shoulder / tap ADS\nR Reload | B Single / Auto | Alt Free look\nEsc Class select | Click Capture | F5 Reset\nPrototype tuning / unified map lane");

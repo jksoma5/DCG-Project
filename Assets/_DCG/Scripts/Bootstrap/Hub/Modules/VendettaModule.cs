@@ -22,7 +22,14 @@ namespace DCG.Bootstrap.Hub
         public Vector3[] targetOffsets = { new Vector3(0, 0, 8), new Vector3(-2, 0, 9) };
         public Vector3 highGroundTargetOffset = new Vector3(0, 0, 1.5f);
 
+        // Where Vendetta stands in a duel, measured from the plaza centre. Inside dash range of the
+        // middle, so the class that closes distance can be fought by one that also closes distance.
+        public Vector3 duelSpawnOffset = new Vector3(0, 0, 5);
+
         public override ClassId Id => ClassId.Vendetta;
+        // Vendetta can stand in as another class's opponent.
+        public override bool CanBeOpponent => true;
+        public override ActorSimulation PrimaryActor => player;
         public override string DisplayName => "VENDETTA  /  dash and sword throw";
         public override string Summary => "WASD move, Space jump, Shift dash into spin, E throw and fly";
 
@@ -37,16 +44,25 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            Vector3 spawn = Context.Map.vendettaSpawn.position;
+            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            Vector3 spawn = duel
+                ? Context.Map.plazaCenter.position + duelSpawnOffset
+                : Context.Map.vendettaSpawn.position;
             player = SpawnActor(spawn, 0, playerMaterial);
             controller = player.GetComponent<VendettaController>();
             if (controller == null) controller = player.gameObject.AddComponent<VendettaController>();
             controller.tuning = tuning;
-            foreach (var offset in targetOffsets) SpawnActor(spawn + offset, 1, targetMaterial);
-            SpawnActor(Context.Map.highGround.position + highGroundTargetOffset, 1, targetMaterial);
+            if (!duel)
+            {
+                foreach (var offset in targetOffsets) SpawnActor(spawn + offset, 1, targetMaterial);
+                SpawnActor(Context.Map.highGround.position + highGroundTargetOffset, 1, targetMaterial);
+            }
 
             heldSword = FindSword(player.transform);
             if (heldSword != null) { swordLocal = heldSword.localPosition; swordRotation = heldSword.localRotation; }
+            // Standing in for somebody else's opponent: the sword stays at rest in his hand, and the
+            // camera, the input and the skill effects belong to the class being driven.
+            if (!Driven) return;
 
             var host = Context.Camera.gameObject;
             Context.Camera.fieldOfView = 65;
@@ -127,7 +143,7 @@ namespace DCG.Bootstrap.Hub
 
         public override void UpdateView(float deltaTime)
         {
-            if (player == null || controller == null) return;
+            if (!Driven || player == null || controller == null || rig == null) return;
             rig.aim = input.Aim;
             bool airborneSword = controller.Phase == VendettaPhase.SwordThrow || controller.Phase == VendettaPhase.Flight;
             if (heldSword != null) heldSword.gameObject.SetActive(!airborneSword);
@@ -161,7 +177,7 @@ namespace DCG.Bootstrap.Hub
 
         public override void DrawHud()
         {
-            if (controller == null) return;
+            if (!Driven || controller == null) return;
             GUI.Box(new Rect(20, 20, 355, 116), "VENDETTA");
             GUI.Label(new Rect(35, 48, 330, 80),
                 "WASD  Move    Mouse  Look    Space  Jump\nShift  Dash -> spinning slash\nE  Throw sword -> fly to sword -> stop");
