@@ -12,8 +12,11 @@ namespace DCG.Gameplay
         float remaining;
         ulong shotSequence;
         public int Ammo { get; private set; }
+        public void ApplyAmmoSnapshot(int ammo) { Ammo = Mathf.Clamp(ammo, 0, owner.tuning.magazineSize); }
         public ActionState State { get; private set; } = ActionState.Ready;
         public event Action<CombatEvent> Fired;
+        public void ShowNetworkShot(uint id, Vector3 origin, Vector3 impact)
+        { Fired?.Invoke(new CombatEvent { EventId=id, ActorId=owner.Id, Origin=origin, ImpactPoint=impact }); }
         public CombatController(ActorSimulation owner)
         { this.owner = owner; Ammo = owner.tuning.magazineSize; }
         public bool CanReach(ActorSimulation candidate)

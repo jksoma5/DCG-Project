@@ -43,7 +43,7 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            bool duel = Context.Hub.ArenaMode || Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
             // In a duel the M416 faces a class, not a target set, so it stands on the plaza rather than
             // at the lane firing line.
             Vector3 line = duel
@@ -62,8 +62,16 @@ namespace DCG.Bootstrap.Hub
             }
             // Standing in for somebody else's opponent: same actor and same simulation, but the camera,
             // the input and the weapon view models belong to the class being driven.
-            if (!Driven) return;
 
+            tracer = Track(new GameObject("Rifle tracer")).AddComponent<LineRenderer>();
+            tracer.sharedMaterial = tracerMaterial; tracer.positionCount = 2;
+            tracer.startWidth = tracer.endWidth = .025f; tracer.enabled = false;
+            tracerUntil = 0;
+            rifle.Tracer += ShowTracer;
+        }
+
+        protected override void OnAcquireControl()
+        {
             var host = Context.Camera.gameObject;
             var camera = Context.Camera;
             camera.nearClipPlane = .03f;
@@ -86,24 +94,30 @@ namespace DCG.Bootstrap.Hub
             adsGun.localScale = Vector3.one * .65f;
             adsGun.gameObject.SetActive(false);
 
-            tracer = Track(new GameObject("Rifle tracer")).AddComponent<LineRenderer>();
-            tracer.sharedMaterial = tracerMaterial; tracer.positionCount = 2;
-            tracer.startWidth = tracer.endWidth = .025f; tracer.enabled = false;
-            tracerUntil = 0;
-            rifle.Tracer += ShowTracer;
+
+        }
+
+        protected override void OnReleaseControl()
+        {
+            if (input != null) input.Release();
+            if (model != null) model.gameObject.SetActive(true);
+            if (gun != null) gun.gameObject.SetActive(true);
+            input = null; rig = null;
         }
 
         protected override void OnDeactivate()
         {
             if (rifle != null) rifle.Tracer -= ShowTracer;
-            if (input != null) input.Release();
+
             player = null; rifle = null; input = null; rig = null;
             model = null; gun = null; adsGun = null; tracer = null;
         }
 
         public override void ResetState()
         {
+            if (NetworkMode) return;
             var hub = Context.Hub;
+            if (hub.ArenaMode) { hub.ResetActive(); return; }
             Deactivate();
             hub.Select(this);
         }
@@ -137,6 +151,18 @@ namespace DCG.Bootstrap.Hub
         // still placed after the actor has moved, exactly as it was in the lab.
         public override void LateUpdateView(float deltaTime)
         {
+            if (tracer != null) tracer.enabled = Time.time < tracerUntil;
+            if (NetworkMode && !Driven && rifle != null)
+            {
+                if (model != null)
+                {
+                    model.localPosition = new Vector3(rifle.Lean * .22f, rifle.Height * .5f, 0);
+                    model.localScale = rifle.Stance == RifleStance.Prone
+                        ? new Vector3(.65f, .3f, 1.5f) : new Vector3(.7f, rifle.Height * .5f, .7f);
+                    model.localRotation = Quaternion.Euler(0, 0, -rifle.Lean * 12);
+                }
+                if (gun != null) gun.SetPositionAndRotation(rifle.Muzzle, rifle.AimRotation);
+            }
             if (!Driven || player == null || !player.Initialized || rig == null) return;
             var tune = rifle.tuning;
             bool ads = rifle.AimMode == RifleAimMode.Ads;
@@ -176,6 +202,7 @@ namespace DCG.Bootstrap.Hub
                 rifle.AimMode == RifleAimMode.Ads ? "." : "+");
             GUI.color = Color.white;
             if (!player.Initialized) return;
+            if (Context.Hub.ArenaMode) return; // The arena draws shared health bars.
             foreach (var actor in Context.World.Actors)
             {
                 if (actor == player) continue;

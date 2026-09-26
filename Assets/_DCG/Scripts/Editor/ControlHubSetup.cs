@@ -53,6 +53,8 @@ namespace DCG.Editor
             {
                 floor = Load<Material>("Materials/Floor.mat");
                 cover = Load<Material>("Materials/Cover.mat");
+                // Walls and cover between Paul's side camera and the fight are dithered out (FightCameraRig).
+                UseOcclusionDither(cover);
                 teal = Load<Material>("Materials/Player.mat");
                 coral = Load<Material>("Materials/Target.mat");
                 line = Load<Material>("Materials/Line.mat");
@@ -261,6 +263,16 @@ namespace DCG.Editor
                     ". Run DCG/Generate Control Lab and the per-class lab generators first; the rifle " +
                     "and sniper generators also export the first person view model prefabs.");
             return asset;
+        }
+
+        // Switching the shader keeps the URP Lit properties: the dither shader is a copy of Lit.
+        public static void UseOcclusionDither(Material material)
+        {
+            var shader = Shader.Find("DCG/Occlusion Dither Lit");
+            if (shader == null) throw new InvalidOperationException("Missing shader: DCG/Occlusion Dither Lit.");
+            if (material.shader == shader) return;
+            material.shader = shader;
+            EditorUtility.SetDirty(material);
         }
 
         static Transform Anchor(string name, Vector3 at, Transform parent)

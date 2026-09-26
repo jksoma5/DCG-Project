@@ -6,7 +6,7 @@ using UnityEngine;
 namespace DCG.Classes.Sniper
 {
     public enum SniperWeapon { Sniper=1, Pistol=2, Knife=3 }
-    public sealed class SniperController : MonoBehaviour, IActorActionPolicy, IActorAmmoSource
+    public sealed partial class SniperController : MonoBehaviour, IActorActionPolicy, IActorAmmoSource
     {
         public SniperTuning tuning;
         ActorSimulation actor;
@@ -29,6 +29,7 @@ namespace DCG.Classes.Sniper
         public int ShotsFired { get; private set; }
         public int KnifeAttacks { get; private set; }
         public int Ammo { get { Ensure();return ammo[(int)Weapon]; } }
+        public void ApplyAmmoSnapshot(int value) { Ensure(); ammo[(int)Weapon] = Mathf.Clamp(value, 0, Capacity); }
         public int Reserve { get { Ensure();return reserve[(int)Weapon]; } }
         public int AmmoFor(SniperWeapon weapon) { Ensure();return ammo[(int)weapon]; }
         public float RecoveryRemaining => recovery[(int)Weapon];

@@ -40,6 +40,7 @@ namespace DCG.Presentation
             scopeRoot.gameObject.SetActive(scoped);
             scopeRoot.localScale=Vector3.one*(.1f*Mathf.Tan(fov*.5f*Mathf.Deg2Rad));
         }
+        void OnDisable() { if(scopeRoot!=null)scopeRoot.gameObject.SetActive(false); }
         void OnDestroy()
         {
             if(maskMesh!=null)Destroy(maskMesh);

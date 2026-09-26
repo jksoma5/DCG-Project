@@ -10,7 +10,7 @@ namespace DCG.Classes.Rifle
     public enum RifleAimMode { Hip, Shoulder, Ads }
     public enum RifleFireMode { Single, Auto }
 
-    public sealed class RifleController : MonoBehaviour, IActorActionPolicy, IActorAmmoSource
+    public sealed partial class RifleController : MonoBehaviour, IActorActionPolicy, IActorAmmoSource
     {
         public const int ToggleCrouch = 1, ToggleProne = 2, ToggleFireMode = 3;
         public RifleTuning tuning;
@@ -26,6 +26,7 @@ namespace DCG.Classes.Rifle
         struct Bullet { public Vector3 position, velocity; public float distance; public ulong id; }
         public event Action<Vector3, Vector3> Tracer;
         public int Ammo { get; private set; }
+        public void ApplyAmmoSnapshot(int ammo) { Ensure(); Ammo = Mathf.Clamp(ammo, 0, tuning.magazineSize); }
         public int Reserve { get; private set; }
         public int ShotsFired { get; private set; }
         public float ReloadRemaining { get; private set; }

@@ -80,7 +80,7 @@ namespace DCG.Classes.Graves
         CommandEnvelope Envelope(CommandType type) => new CommandEnvelope {
             ActorId = actor.Id, Sequence = ++sequence, ClientTick = actor.World.Tick, CommandType = type
         };
-        void Send(PlayerCommand value) { actor.World.Session.Submit(actor.Id, value); }
+        void Send(PlayerCommand value) { actor.World.Commands.Submit(actor.Id, value); }
         public void StopOrder()
         {
             AttackMoveArmed = false; HasDestination = false;

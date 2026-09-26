@@ -33,6 +33,28 @@ namespace DCG.Gameplay
             if (controller != null && controller.isGrounded) verticalSpeed = Mathf.Max(0, speed);
         }
         public void ClearVerticalVelocity() { verticalSpeed = 0; }
+        public void PlaceReplica(Vector3 position, float facing)
+        {
+            if (controller == null) controller = GetComponent<CharacterController>();
+            controller.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0, facing, 0));
+        }
+        public void CorrectPrediction(Vector3 correction)
+        {
+            if (!CommandValidation.IsFinite(correction)) return;
+            if (correction.sqrMagnitude > 9) ApplySnapshot(transform.position + correction, transform.eulerAngles.y, Velocity);
+            else controller.Move(correction);
+        }
+        public void ApplySnapshot(Vector3 position, float facing, Vector3 velocity)
+        {
+            if (!CommandValidation.IsFinite(position) || !CommandValidation.IsFinite(velocity) || !CommandValidation.IsFinite(facing)) return;
+            if (controller == null) controller = GetComponent<CharacterController>();
+            controller.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0, facing, 0));
+            controller.enabled = true;
+            Velocity = velocity;
+            verticalSpeed = velocity.y;
+        }
         public void StepFullVelocity(Vector3 velocity, float deltaTime)
         {
             if (!CommandValidation.IsFinite(velocity) || deltaTime <= 0) return;

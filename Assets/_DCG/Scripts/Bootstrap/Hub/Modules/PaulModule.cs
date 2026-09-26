@@ -53,7 +53,7 @@ namespace DCG.Bootstrap.Hub
             // The stage axis is the map's east-west axis, so the camera looking north from the south
             // puts east on the right of the screen (doc 12, 1-1). These two anchors are the only
             // positions the class needs from the map.
-            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            bool duel = Context.Hub.ArenaMode || Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
             first = SpawnFighter("Paul prototype",
                 duel ? Context.Map.plazaCenter.position + duelSpawnOffset : Context.Map.fightWest.position,
                 0, playerMaterial);
@@ -74,8 +74,12 @@ namespace DCG.Bootstrap.Hub
             tape.Clear();
             Recording = false; replayIndex = 0; DummyMode = FightDummyMode.Idle;
             sampleTime = Time.realtimeSinceStartupAsDouble;
-            if (!Driven) return;
 
+        }
+
+        protected override void OnAcquireControl()
+        {
+            sampleTime = Time.realtimeSinceStartupAsDouble;
             var host = Context.Camera.gameObject;
             Context.Camera.nearClipPlane = .05f;
             rig = Attach<FightCameraRig>(host);
@@ -114,6 +118,8 @@ namespace DCG.Bootstrap.Hub
             receiver.rules = first.moveSet;
         }
 
+        protected override void OnReleaseControl() { input = null; rig = null; }
+
         protected override void OnDeactivate()
         {
             Match = null; first = null; second = null; input = null; rig = null;
@@ -122,7 +128,9 @@ namespace DCG.Bootstrap.Hub
 
         public override void ResetState()
         {
+            if (NetworkMode) return;
             var hub = Context.Hub;
+            if (hub.ArenaMode) { hub.ResetActive(); return; }
             Deactivate();
             hub.Select(this);
         }
@@ -158,7 +166,8 @@ namespace DCG.Bootstrap.Hub
             if (Match == null || Match.DefenderTransform == null) return;
             // Standing in as an opponent: the frame loop still runs, so he falls, takes reactions and
             // gets up, but no input arrives and no dummy behaviour is driven.
-            if (input == null) { Tick(new FightInputFrame { Direction = 5 }); return; }
+            if (input == null) { Tick(Context.Hub.ArenaMode ? Context.Hub.EnemyFightInput(this) : new FightInputFrame { Direction = 5 }); return; }
+            if (!input.isActiveAndEnabled) { sampleTime = Time.realtimeSinceStartupAsDouble; Tick(new FightInputFrame { Direction = 5 }); return; }
             sampleTime += FrameClock.StepSeconds;
             input.Poll();
             if (input.Pressed("Reset")) { ResetState(); return; }
@@ -169,6 +178,17 @@ namespace DCG.Bootstrap.Hub
             if (input.Pressed("Record")) SetRecording(!Recording);
             if (input.Pressed("Replay")) StartReplay();
             Tick(input.Sample(sampleTime));
+        }
+
+        public void SampleNetworkInput()
+        {
+            if (input == null || !input.isActiveAndEnabled) return;
+            sampleTime = Time.realtimeSinceStartupAsDouble;
+            input.Poll();
+            var frame = input.Sample(sampleTime);
+            // Each player's camera puts their own fighter on the near side.
+            frame.Direction = FightDirections.Relative(frame.Direction, first.Side);
+            Send(first, frame);
         }
 
         public void SetRecording(bool value) { Recording = value; if (value) tape.Clear(); }
@@ -209,7 +229,7 @@ namespace DCG.Bootstrap.Hub
 
         void Send(FighterAgent fighter, FightInputFrame frame)
         {
-            Context.World.Session.Submit(fighter.Actor.Id, new PlayerCommand {
+            Context.World.Commands.Submit(fighter.Actor.Id, new PlayerCommand {
                 Envelope = new CommandEnvelope { ActorId = fighter.Actor.Id, Sequence = ++sequence,
                     CommandType = CommandType.FightInput },
                 Fight = frame

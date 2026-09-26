@@ -20,15 +20,16 @@ namespace DCG.Gameplay
         public DCG.Gameplay.Fighting.FightReactionReceiver Reaction { get; set; }
         public SimulationWorld World { get; private set; }
         public uint LastSequence { get; private set; }
+        uint lastClientTick, lastInputTick;
         public bool Initialized => Health != null;
         public Vector3 AimPoint => transform.position + Vector3.up;
-        public void Initialize(SimulationWorld world)
+        public void Initialize(SimulationWorld world, float healthMultiplier = 1f)
         {
             if (Initialized) return;
             if (tuning == null) throw new System.InvalidOperationException("Actor needs a tuning asset.");
             World = world;
             Motor = GetComponent<CharacterMotor>();
-            Health = new HealthState(tuning.maxHealth);
+            Health = new HealthState(tuning.maxHealth * healthMultiplier);
             Combat = new CombatController(this);
             foreach (var component in GetComponents<MonoBehaviour>())
                 if (component is IMovementPolicy policy) { Movement = policy; break; }
@@ -37,6 +38,8 @@ namespace DCG.Gameplay
         public void Receive(PlayerCommand command)
         {
             LastSequence = command.Envelope.Sequence;
+            lastClientTick = command.Envelope.ClientTick;
+            lastInputTick = World.Tick;
             Movement?.Receive(command);
         }
         public void Step(float dt, uint tick)
@@ -64,6 +67,7 @@ namespace DCG.Gameplay
         }
         public ActorSnapshot Snapshot(uint tick) => new ActorSnapshot {
             ActorId = Id, ServerTick = tick, LastProcessedSequence = LastSequence,
+            LastProcessedClientTick = lastClientTick, LastProcessedServerTick = lastInputTick,
             Position = transform.position, Velocity = Motor.Velocity, Facing = transform.eulerAngles.y,
             LifeState = Health.IsAlive ? LifeState.Alive : LifeState.Dead,
             MovementState = Motor.State, ActionState = Movement is IActorActionPolicy p ? p.ActionState : Combat.State,

@@ -21,5 +21,12 @@ namespace DCG.Gameplay
             if (!IsAlive) Died?.Invoke();
             return true;
         }
+        public void ApplySnapshot(float current)
+        {
+            if (float.IsNaN(current) || float.IsInfinity(current)) return;
+            bool alive = IsAlive;
+            Current = Math.Max(0, Math.Min(Maximum, current));
+            if (alive && !IsAlive) Died?.Invoke();
+        }
     }
 }

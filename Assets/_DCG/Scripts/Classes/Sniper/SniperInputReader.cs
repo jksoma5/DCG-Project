@@ -16,6 +16,7 @@ namespace DCG.Classes.Sniper
         InputActionAsset runtime;InputActionMap map;uint sequence;
         void OnEnable()
         {
+            if (actor != null) Aim = new Vector2(actor.transform.eulerAngles.y, 0);
             if(controls==null)return;
             runtime=Instantiate(controls);map=runtime.FindActionMap("Sniper",true);map.Enable();Capture();
         }
@@ -33,7 +34,7 @@ namespace DCG.Classes.Sniper
             Aim=new Vector2(Mathf.Repeat(Aim.x+delta.x,360),Mathf.Clamp(Aim.y-delta.y,-80,80));
             // Switch first, then consume this frame's inputs on the new weapon.
             for(int slot=1;slot<=3;slot++)
-                if(map["Slot"+slot].WasPressedThisFrame())actor.World.Session.Submit(actor.Id,new PlayerCommand{
+                if(map["Slot"+slot].WasPressedThisFrame())actor.World.Commands.Submit(actor.Id,new PlayerCommand{
                     Envelope=Envelope(CommandType.Action),Action=new ActionCommand{ActionId=slot}});
             ControlButtons held=0,pressed=0;
             if(map["Walk"].IsPressed())held|=ControlButtons.Walk;
@@ -42,7 +43,7 @@ namespace DCG.Classes.Sniper
             if(map["Secondary"].WasPressedThisFrame())pressed|=ControlButtons.Aim;
             if(map["Reload"].WasPressedThisFrame())pressed|=ControlButtons.Reload;
             if(map["Jump"].WasPressedThisFrame())pressed|=ControlButtons.Jump;
-            actor.World.Session.Submit(actor.Id,new PlayerCommand{
+            actor.World.Commands.Submit(actor.Id,new PlayerCommand{
                 Envelope=Envelope(CommandType.DirectControl),
                 Direct=new DirectControlFrame{MoveAxes=Vector2.ClampMagnitude(map["Move"].ReadValue<Vector2>(),1),
                     AimYawPitch=Aim,HeldButtons=held,PressedButtons=pressed}});
@@ -51,7 +52,7 @@ namespace DCG.Classes.Sniper
         {
             Captured=false;Cursor.lockState=CursorLockMode.None;Cursor.visible=true;
             if(actor!=null&&actor.Initialized&&actor.World!=null)
-                actor.World.Session.Submit(actor.Id,new PlayerCommand{Envelope=Envelope(CommandType.Stop)});
+                actor.World.Commands.Submit(actor.Id,new PlayerCommand{Envelope=Envelope(CommandType.Stop)});
         }
         void OnApplicationFocus(bool focus){if(!focus)Release();}
         void OnDisable(){Release();if(runtime!=null){runtime.Disable();Destroy(runtime);}}

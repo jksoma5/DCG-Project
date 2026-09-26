@@ -36,6 +36,17 @@ namespace DCG.Gameplay
             queue.Enqueue(command);
             return true;
         }
+        // Transfer input ownership without recreating the actor or accepting old queued commands.
+        public void TransferControl(ActorId id)
+        {
+            int count = queue.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var command = queue.Dequeue();
+                if (command.Envelope.ActorId != id) queue.Enqueue(command);
+            }
+            sequences.Remove(id);
+        }
         public void Drain()
         {
             while (queue.Count > 0)

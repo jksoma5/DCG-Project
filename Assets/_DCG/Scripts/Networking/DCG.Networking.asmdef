@@ -3,7 +3,10 @@
   "rootNamespace": "DCG.Networking",
   "references": [
     "DCG.Core",
-    "DCG.Gameplay"
+    "DCG.Gameplay",
+    "Unity.Netcode.Runtime",
+    "Unity.Networking.Transport",
+    "Unity.Collections"
   ],
   "includePlatforms": [],
   "autoReferenced": true

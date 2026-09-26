@@ -22,6 +22,8 @@ namespace DCG.Bootstrap.Hub
         protected bool Driven => Role == HubRole.Controlled;
 
         protected HubContext Context { get; private set; }
+        readonly List<GameObject> controlObjects = new List<GameObject>();
+        bool buildingControls;
         readonly List<GameObject> spawned = new List<GameObject>();
         readonly List<ActorSimulation> registered = new List<ActorSimulation>();
         readonly List<Component> attached = new List<Component>();
@@ -39,6 +41,7 @@ namespace DCG.Bootstrap.Hub
             Role = role;
             Active = true;
             OnActivate();
+            if (Driven) AcquireControl();
         }
 
         public virtual void SetOpponent(IControlModule opponent) { }
@@ -46,7 +49,43 @@ namespace DCG.Bootstrap.Hub
         public void Deactivate()
         {
             if (!Active) return;
+            ReleaseControl();
             OnDeactivate();
+            foreach (var actor in registered)
+                if (actor != null && Context != null) Context.World.Unregister(actor);
+            registered.Clear();
+            for (int i = spawned.Count - 1; i >= 0; i--)
+                if (spawned[i] != null) Destroy(spawned[i]);
+            spawned.Clear();
+            Active = false;
+            Role = HubRole.Controlled;
+            Context = null;
+        }
+
+        public void SetInputEnabled(bool enabled)
+        {
+            foreach (var host in deferred) if (host != null) host.SetActive(enabled);
+        }
+
+        protected bool NetworkMode => Context != null && Context.Hub.NetworkMode;
+
+        public void SetControlled(bool controlled)
+        {
+            if (!Active || Driven == controlled) return;
+            if (controlled) { Role = HubRole.Controlled; AcquireControl(); }
+            else { ReleaseControl(); Role = HubRole.Opponent; }
+        }
+
+        void AcquireControl()
+        {
+            buildingControls = true;
+            try { OnAcquireControl(); }
+            finally { buildingControls = false; }
+        }
+
+        void ReleaseControl()
+        {
+            OnReleaseControl();
             // Objects holding a deferred component are switched off first, which runs their OnDisable
             // now rather than at the end of the frame: that is where an input reader gives back its
             // action map, the cursor and the input update mode.
@@ -67,16 +106,13 @@ namespace DCG.Bootstrap.Hub
                 Destroy(component);
             }
             attached.Clear();
-            foreach (var actor in registered)
-                if (actor != null && Context != null) Context.World.Unregister(actor);
-            registered.Clear();
-            for (int i = spawned.Count - 1; i >= 0; i--)
-                if (spawned[i] != null) Destroy(spawned[i]);
-            spawned.Clear();
-            Active = false;
-            Role = HubRole.Controlled;
-            Context = null;
+            foreach (var item in controlObjects)
+                if (item != null) { item.SetActive(false); Destroy(item); }
+            controlObjects.Clear();
         }
+
+        protected virtual void OnAcquireControl() { }
+        protected virtual void OnReleaseControl() { }
 
         public virtual void ResetState() { }
         public virtual void TickFixed() { }
@@ -97,7 +133,7 @@ namespace DCG.Bootstrap.Hub
 
         protected GameObject Track(GameObject instance)
         {
-            if (instance != null) spawned.Add(instance);
+            if (instance != null) (buildingControls ? controlObjects : spawned).Add(instance);
             return instance;
         }
 
@@ -128,7 +164,7 @@ namespace DCG.Bootstrap.Hub
         protected void Register(ActorSimulation actor)
         {
             actor.actorNumber = Context.NextActorId();
-            Context.World.Register(actor);
+            Context.World.Register(actor, Context.Hub.ArenaMode ? 5f : 1f);
             registered.Add(actor);
         }
     }

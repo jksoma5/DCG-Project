@@ -3,7 +3,7 @@ using UnityEngine;
 namespace DCG.Gameplay.Fighting
 {
     public enum FighterReactionState { None, Hitstun, Blockstun, Airborne, Down, GettingUp }
-    public sealed class FighterStateMachine
+    public sealed partial class FighterStateMachine
     {
         public MoveData Move { get; private set; }
         public int Age { get; private set; }

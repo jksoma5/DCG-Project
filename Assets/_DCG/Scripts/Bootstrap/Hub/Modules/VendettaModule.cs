@@ -44,7 +44,7 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            bool duel = Context.Hub.ArenaMode || Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
             Vector3 spawn = duel
                 ? Context.Map.plazaCenter.position + duelSpawnOffset
                 : Context.Map.vendettaSpawn.position;
@@ -62,8 +62,15 @@ namespace DCG.Bootstrap.Hub
             if (heldSword != null) { swordLocal = heldSword.localPosition; swordRotation = heldSword.localRotation; }
             // Standing in for somebody else's opponent: the sword stays at rest in his hand, and the
             // camera, the input and the skill effects belong to the class being driven.
-            if (!Driven) return;
 
+            thrownSword = Track(Blade("Vendetta thrown sword")).transform;
+            thrownSword.gameObject.SetActive(false);
+            spinRing = Line("Vendetta spin area", 65, .045f);
+            tether = Line("Vendetta sword path", 2, .018f);
+        }
+
+        protected override void OnAcquireControl()
+        {
             var host = Context.Camera.gameObject;
             Context.Camera.fieldOfView = 65;
             rig = Attach<ThirdPersonRig>(host);
@@ -75,22 +82,26 @@ namespace DCG.Bootstrap.Hub
                 reader.ResetRequested = ResetState;
             });
 
-            thrownSword = Track(Blade("Vendetta thrown sword")).transform;
-            thrownSword.gameObject.SetActive(false);
-            spinRing = Line("Vendetta spin area", 65, .045f);
-            tether = Line("Vendetta sword path", 2, .018f);
+
+        }
+
+        protected override void OnReleaseControl()
+        {
+            if (input != null) input.Release();
+            input = null; rig = null;
         }
 
         protected override void OnDeactivate()
         {
-            if (input != null) input.Release();
             player = null; controller = null; input = null; rig = null;
             heldSword = null; thrownSword = null; spinRing = null; tether = null;
         }
 
         public override void ResetState()
         {
+            if (NetworkMode) return;
             var hub = Context.Hub;
+            if (hub.ArenaMode) { hub.ResetActive(); return; }
             Deactivate();
             hub.Select(this);
         }
@@ -143,8 +154,8 @@ namespace DCG.Bootstrap.Hub
 
         public override void UpdateView(float deltaTime)
         {
-            if (!Driven || player == null || controller == null || rig == null) return;
-            rig.aim = input.Aim;
+            if (player == null || controller == null) return;
+            if (Driven && rig != null && input != null) rig.aim = input.Aim;
             bool airborneSword = controller.Phase == VendettaPhase.SwordThrow || controller.Phase == VendettaPhase.Flight;
             if (heldSword != null) heldSword.gameObject.SetActive(!airborneSword);
             thrownSword.gameObject.SetActive(airborneSword);

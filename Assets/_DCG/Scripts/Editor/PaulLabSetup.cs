@@ -30,7 +30,7 @@ namespace DCG.Editor
             SceneManager.SetActiveScene(scene);
             try
             {
-                floor=Material("PaulFloor",new Color(.12f,.12f,.14f));cover=Material("PaulCover",new Color(.25f,.28f,.32f));
+                floor=Material("PaulFloor",new Color(.12f,.12f,.14f));cover=Material("PaulCover",new Color(.25f,.28f,.32f));ControlHubSetup.UseOcclusionDither(cover);
                 red=Material("PaulRed",new Color(.75f,.16f,.12f));blue=Material("PaulBlue",new Color(.13f,.45f,.8f));
                 accent=Material("PaulHit",new Color(1,.7f,.1f),true);
                 var moves=Asset<FightMoveSet>("Data/Fighting/Paul_Moves.asset");

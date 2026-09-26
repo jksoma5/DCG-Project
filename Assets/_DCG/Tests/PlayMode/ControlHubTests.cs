@@ -498,12 +498,10 @@ namespace DCG.Tests
             Assert.That(hurtbox.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("Hurtbox")));
         }
 
-        [UnityTest] public IEnumerator ClassesThatCannotStandInAsOpponentsAreRefused()
+        [UnityTest] public IEnumerator InvalidDuelsAreRefused()
         {
-            // Only the classes prepared for it can be an opponent yet; the hub says no rather than
-            // building a half-live class.
-            Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Graves), Is.False);
             Assert.That(hub.SelectDuel(ClassId.Paul, ClassId.Paul), Is.False);
+            Assert.That(hub.SelectDuel(ClassId.Paul, (ClassId)999), Is.False);
             Assert.That(hub.Selecting, Is.True, "A refused duel must not start anything.");
             yield return null;
         }
@@ -512,7 +510,7 @@ namespace DCG.Tests
         // each, no practice targets, and everything to do with being played belonging to the driven side.
         [UnityTest] public IEnumerator EveryOpenedOpponentFightsTheFighterTheSameWay()
         {
-            foreach (var id in new[] { ClassId.Sniper, ClassId.Rifle, ClassId.Vendetta })
+            foreach (var id in new[] { ClassId.Sniper, ClassId.Rifle, ClassId.Vendetta, ClassId.Graves })
             {
                 Assert.That(hub.SelectDuel(ClassId.Paul, id), Is.True, id + " cannot stand in yet.");
                 yield return null;

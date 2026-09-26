@@ -18,6 +18,7 @@ namespace DCG.Classes.Vendetta
         public bool Captured { get; private set; }
         void OnEnable()
         {
+            if (actor != null) Aim = new Vector2(actor.transform.eulerAngles.y, 0);
             if (controls == null) return;
             runtime = Instantiate(controls); map = runtime.FindActionMap("Vendetta",true); map.Enable();
             Capture();
@@ -52,7 +53,7 @@ namespace DCG.Classes.Vendetta
         CommandEnvelope Envelope(CommandType kind) => new CommandEnvelope {
             ActorId = actor.Id, Sequence = ++sequence, ClientTick = actor.World.Tick, CommandType = kind
         };
-        void Send(PlayerCommand command) { actor.World.Session.Submit(actor.Id,command); }
+        void Send(PlayerCommand command) { actor.World.Commands.Submit(actor.Id,command); }
         public void Release()
         {
             Captured = false; Cursor.lockState = CursorLockMode.None; Cursor.visible = true;

@@ -3,6 +3,8 @@
   "rootNamespace": "DCG.Bootstrap",
   "references": [
     "DCG.Core",
+    "DCG.Networking",
+    "Unity.Netcode.Runtime",
     "DCG.Gameplay",
     "DCG.Classes",
     "DCG.Presentation",

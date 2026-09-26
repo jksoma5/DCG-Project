@@ -48,7 +48,7 @@ namespace DCG.Bootstrap.Hub
 
         protected override void OnActivate()
         {
-            bool duel = Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
+            bool duel = Context.Hub.ArenaMode || Role == HubRole.Opponent || Context.Hub.OpponentModule != null;
             // In a duel the TRG faces a class, not a target set: it stands on the plaza, not at the
             // firing line, and brings nothing to shoot at but the other fighter.
             Vector3 line = duel
@@ -58,12 +58,24 @@ namespace DCG.Bootstrap.Hub
             sniper = player.GetComponent<SniperController>();
             if (sniper == null) sniper = player.gameObject.AddComponent<SniperController>();
             sniper.tuning = tuning;
+            var view = player.GetComponent<ActorView>();
+            if (view != null && view.body != null) view.body.enabled = !Driven;
             if (!duel)
                 foreach (var offset in targetOffsets) SpawnActor(line + offset, 1, targetMaterial);
             // Standing in for somebody else's opponent: same actor and same simulation, but the camera,
             // the input and the weapon view models belong to the class being driven.
-            if (!Driven) return;
 
+            tracer = Track(new GameObject("Sniper tracer")).AddComponent<LineRenderer>();
+            tracer.sharedMaterial = tracerMaterial; tracer.positionCount = 2;
+            tracer.startWidth = tracer.endWidth = .015f; tracer.enabled = false;
+            tracerUntil = 0;
+            sniper.Fired += ShowTracer;
+        }
+
+        protected override void OnAcquireControl()
+        {
+            var view = player.GetComponent<ActorView>();
+            if (view != null && view.body != null) view.body.enabled = false;
             var host = Context.Camera.gameObject;
             var camera = Context.Camera;
             camera.nearClipPlane = .025f;
@@ -87,24 +99,30 @@ namespace DCG.Bootstrap.Hub
                 weaponRest[i] = weapons[i].localPosition;
             }
 
-            tracer = Track(new GameObject("Sniper tracer")).AddComponent<LineRenderer>();
-            tracer.sharedMaterial = tracerMaterial; tracer.positionCount = 2;
-            tracer.startWidth = tracer.endWidth = .015f; tracer.enabled = false;
-            tracerUntil = 0;
-            sniper.Fired += ShowTracer;
+
+        }
+
+        protected override void OnReleaseControl()
+        {
+            if (input != null) input.Release();
+            var view = player != null ? player.GetComponent<ActorView>() : null;
+            if (view != null && view.body != null) view.body.enabled = true;
+            input = null; rig = null;
         }
 
         protected override void OnDeactivate()
         {
             if (sniper != null) sniper.Fired -= ShowTracer;
-            if (input != null) input.Release();
+
             player = null; sniper = null; input = null; rig = null; tracer = null;
             weapons = new Transform[0]; weaponRest = new Vector3[0];
         }
 
         public override void ResetState()
         {
+            if (NetworkMode) return;
             var hub = Context.Hub;
+            if (hub.ArenaMode) { hub.ResetActive(); return; }
             Deactivate();
             hub.Select(this);
         }
@@ -141,6 +159,16 @@ namespace DCG.Bootstrap.Hub
         // Ported from SniperLabController.LateUpdate.
         public override void LateUpdateView(float deltaTime)
         {
+            if (tracer != null) tracer.enabled = Time.time < tracerUntil;
+            if (NetworkMode && !Driven && player != null && sniper != null)
+            {
+                var view = player.GetComponent<ActorView>();
+                if (view != null && view.body != null)
+                {
+                    view.body.transform.localPosition = Vector3.up * sniper.Height * .5f;
+                    view.body.transform.localScale = new Vector3(.7f, sniper.Height * .5f, .7f);
+                }
+            }
             if (!Driven || player == null || !player.Initialized || rig == null) return;
             var tune = sniper.tuning;
             float fov = sniper.ScopeLevel == 2 ? tune.deepScopeFov :
@@ -180,6 +208,7 @@ namespace DCG.Bootstrap.Hub
                 GUI.color = Color.white;
             }
             if (!player.Initialized || sniper.ScopeLevel > 0) return;
+            if (Context.Hub.ArenaMode) return; // The arena draws shared health bars.
             foreach (var actor in Context.World.Actors)
             {
                 if (actor == player) continue;

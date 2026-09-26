@@ -33,6 +33,9 @@ namespace DCG.Bootstrap.Hub
         // The only class that points at the world with a visible cursor.
         public override HubCursorMode RequiredCursor => HubCursorMode.Free;
 
+        public override bool CanBeOpponent => true;
+        public override ActorSimulation PrimaryActor => player;
+
         ActorSimulation player, movingTarget;
         GravesInputReader input;
         DebugOverlay overlay;
@@ -48,10 +51,17 @@ namespace DCG.Bootstrap.Hub
         {
             Vector3 origin = Context.Map.gravesSpawn.position;
             player = SpawnActor(origin, 0, playerMaterial);
-            movingTarget = SpawnActor(origin + movingTargetOffset, 1, targetMaterial);
-            foreach (var offset in staticTargetOffsets) SpawnActor(origin + offset, 1, targetMaterial);
+            if (!Context.Hub.ArenaMode && Role != HubRole.Opponent && Context.Hub.OpponentModule == null)
+            {
+                movingTarget = SpawnActor(origin + movingTargetOffset, 1, targetMaterial);
+                foreach (var offset in staticTargetOffsets) SpawnActor(origin + offset, 1, targetMaterial);
+            }
             patrol = false; patrolSide = false; nextPatrolOrder = 0;
 
+        }
+
+        protected override void OnAcquireControl()
+        {
             var host = Context.Camera.gameObject;
             Context.Camera.fieldOfView = tuning.cameraFov;
             Context.CameraTransform.position = player.transform.position + tuning.cameraOffset;
@@ -65,15 +75,21 @@ namespace DCG.Bootstrap.Hub
                 reader.controls = Context.Hub.controls;
             });
 
-            overlay = Attach<DebugOverlay>(host);
-            overlay.actor = player; overlay.worldCamera = Context.Camera;
-            input.IsPointerBlocked = overlay.BlocksPointer;
-            input.UiClicked += overlay.HandleClick;
-            input.WorldClicked += MarkWorldClick;
-            overlay.OrderDetails = OrderDetails;
-            overlay.ResetRequested = ResetState;
-            overlay.PatrolRequested = TogglePatrol;
-            overlay.PatrolActive = () => patrol;
+            if (!Context.Hub.ArenaMode && !NetworkMode)
+            {
+                overlay = Attach<DebugOverlay>(host);
+                overlay.actor = player; overlay.worldCamera = Context.Camera;
+                input.IsPointerBlocked = overlay.BlocksPointer;
+                input.UiClicked += overlay.HandleClick;
+                input.WorldClicked += MarkWorldClick;
+                overlay.OrderDetails = OrderDetails;
+                overlay.ResetRequested = ResetState;
+                overlay.PatrolRequested = TogglePatrol;
+                overlay.PatrolActive = () => patrol;
+            }
+            else input.IsPointerBlocked = NetworkMode ? point => point.y > Screen.height - 120 : Context.Hub.BlocksArenaPointer;
+            if (NetworkMode) input.WorldClicked += MarkWorldClick;
+            if (Context.Hub.ArenaMode) input.WorldClicked += MarkWorldClick;
 
             pathLine = Track(NewLine("Graves active path", .055f, lineMaterial)).GetComponent<LineRenderer>();
             pathLine.positionCount = 0;
@@ -82,7 +98,7 @@ namespace DCG.Bootstrap.Hub
             rangeIndicator.enabled = false; clickMarker.enabled = false;
         }
 
-        protected override void OnDeactivate()
+        protected override void OnReleaseControl()
         {
             if (input != null)
             {
@@ -91,6 +107,11 @@ namespace DCG.Bootstrap.Hub
             }
             if (indicatorMaterial != null) Destroy(indicatorMaterial);
             if (markerMaterial != null) Destroy(markerMaterial);
+            input = null; overlay = null; rig = null;
+        }
+
+        protected override void OnDeactivate()
+        {
             patrol = false;
             player = null; movingTarget = null; input = null; overlay = null; rig = null;
             pathLine = null; rangeIndicator = null; clickMarker = null;
@@ -99,7 +120,9 @@ namespace DCG.Bootstrap.Hub
         // No scene reload. The module rebuilds its own actors in place.
         public override void ResetState()
         {
+            if (NetworkMode) return;
             var hub = Context.Hub;
+            if (hub.ArenaMode) { hub.ResetActive(); return; }
             Deactivate();
             hub.Select(this);
         }
@@ -115,6 +138,13 @@ namespace DCG.Bootstrap.Hub
             if (view != null && view.body != null && material != null) view.body.sharedMaterial = material;
             Register(actor);
             return actor;
+        }
+
+        public override void DrawHud()
+        {
+            if (!Driven || !Context.Hub.ArenaMode) return;
+            GUI.Box(new Rect(20, 20, 380, 115), "GRAVES / CHARACTER ARENA");
+            GUI.Label(new Rect(34, 48, 350, 78), "RMB Move / Attack target | A + LMB Attack move\nS Stop | F8-F12 Switch character\nHP " + player.Health.Current.ToString("0") + " | AMMO " + player.Combat.Ammo);
         }
 
         string OrderDetails()
@@ -160,7 +190,7 @@ namespace DCG.Bootstrap.Hub
 
         public override void UpdateView(float deltaTime)
         {
-            if (player == null || !player.Initialized) return;
+            if (!Driven || input == null || player == null || !player.Initialized) return;
             UpdatePatrol();
             bool armed = input.AttackMoveArmed && player.Health.IsAlive;
             rangeIndicator.enabled = armed;

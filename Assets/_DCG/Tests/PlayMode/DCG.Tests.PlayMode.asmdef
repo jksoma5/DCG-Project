@@ -2,6 +2,9 @@
   "name": "DCG.Tests.PlayMode",
   "references": [
     "DCG.Core",
+    "DCG.Networking",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections",
     "DCG.Gameplay",
     "DCG.Classes",
     "Unity.InputSystem",

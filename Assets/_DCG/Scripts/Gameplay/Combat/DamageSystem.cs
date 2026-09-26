@@ -14,11 +14,13 @@ namespace DCG.Gameplay
     }
     public sealed class DamageSystem
     {
+        public bool Authoritative { get; set; } = true;
         readonly HashSet<(ActorId, ActorId, ulong)> applied = new HashSet<(ActorId, ActorId, ulong)>();
         readonly Queue<(ActorId, ActorId, ulong)> history = new Queue<(ActorId, ActorId, ulong)>();
+        public void Clear() { applied.Clear(); history.Clear(); }
         public bool Apply(DamageRequest request, ActorSimulation target)
         {
-            if (target == null || !target.Initialized || request.Victim != target.Id ||
+            if (!Authoritative || target == null || !target.Initialized || request.Victim != target.Id ||
                 request.Amount <= 0 || !CommandValidation.IsFinite(request.Amount)) return false;
             var key = (request.Attacker, request.Victim, request.AttackId);
             if (applied.Contains(key) || !target.Health.Apply(request.Amount)) return false;

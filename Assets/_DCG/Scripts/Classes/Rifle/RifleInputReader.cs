@@ -21,6 +21,7 @@ namespace DCG.Classes.Rifle
         uint sequence;
         void OnEnable()
         {
+            if (actor != null) Aim = new Vector2(actor.transform.eulerAngles.y, 0);
             if (controls == null) return;
             runtime = Instantiate(controls); map = runtime.FindActionMap("Rifle", true); map.Enable();
             Capture();
@@ -69,7 +70,7 @@ namespace DCG.Classes.Rifle
                 if (hit.collider.GetComponentInParent<ActorSimulation>() == actor || hit.distance >= closest) continue;
                 target = hit.point; closest = hit.distance;
             }
-            actor.World.Session.Submit(actor.Id, new PlayerCommand {
+            actor.World.Commands.Submit(actor.Id, new PlayerCommand {
                 Envelope = Envelope(CommandType.DirectControl),
                 Direct = new DirectControlFrame { MoveAxes = Vector2.ClampMagnitude(map["Move"].ReadValue<Vector2>(), 1),
                     AimYawPitch = Aim, AimTarget = target, HeldButtons = held, PressedButtons = pressed }
@@ -78,14 +79,14 @@ namespace DCG.Classes.Rifle
             if (map["Prone"].WasPressedThisFrame()) Action(RifleController.ToggleProne);
             if (map["FireMode"].WasPressedThisFrame()) Action(RifleController.ToggleFireMode);
         }
-        void Action(int id) => actor.World.Session.Submit(actor.Id, new PlayerCommand {
+        void Action(int id) => actor.World.Commands.Submit(actor.Id, new PlayerCommand {
             Envelope = Envelope(CommandType.Action), Action = new ActionCommand { ActionId = id } });
         public void Release()
         {
             Captured = false; Gesture.Reset(); FreeLook = Vector2.zero;
             Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
             if (actor != null && actor.Initialized && actor.World != null)
-                actor.World.Session.Submit(actor.Id, new PlayerCommand { Envelope = Envelope(CommandType.Stop) });
+                actor.World.Commands.Submit(actor.Id, new PlayerCommand { Envelope = Envelope(CommandType.Stop) });
         }
         void OnApplicationFocus(bool focus) { if (!focus) Release(); }
         void OnDisable() { Release(); if (runtime != null) { runtime.Disable(); Destroy(runtime); } }

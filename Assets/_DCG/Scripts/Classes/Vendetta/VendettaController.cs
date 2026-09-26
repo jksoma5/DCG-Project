@@ -5,7 +5,7 @@ using UnityEngine;
 namespace DCG.Classes.Vendetta
 {
     public enum VendettaPhase { Ready, Dash, Spin, SwordThrow, Flight }
-    public sealed class VendettaController : MonoBehaviour, IActorActionPolicy
+    public sealed partial class VendettaController : MonoBehaviour, IActorActionPolicy
     {
         public const int ShiftAction = 1, EAction = 2;
         public VendettaTuning tuning;

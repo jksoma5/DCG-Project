@@ -13,7 +13,7 @@ namespace DCG.Bootstrap.Hub
     // Two classes can be live at once: one the player drives, one standing in as its opponent. That is
     // what makes a fight against a class from another game possible, so the hub - not a class - drives
     // the world tick for everyone.
-    public sealed class ControlHubController : MonoBehaviour
+    public sealed partial class ControlHubController : MonoBehaviour
     {
         public SimulationWorld world;
         public UnityEngine.InputSystem.InputActionAsset controls;
@@ -22,6 +22,7 @@ namespace DCG.Bootstrap.Hub
         public ControlModuleBase[] modules = new ControlModuleBase[0];
         public ClassSelectScreen selectScreen;
         public HubHud hud;
+        public bool NetworkMode;
 
         public IControlModule ActiveModule { get; private set; }
         public IControlModule OpponentModule { get; private set; }
@@ -65,14 +66,17 @@ namespace DCG.Bootstrap.Hub
 
         void OnDestroy()
         {
+            arenaActions?.Dispose();
             if (ownsUpdateMode) InputSystem.settings.updateMode = previousUpdateMode;
         }
 
-        void Start() { ShowSelect(); }
+        void Start() { if (NetworkMode) { ApplyCursor(HubCursorMode.Free); return; } if (ArenaMode) StartArena(ClassId.Graves); else ShowSelect(); }
 
         // Entering the select screen means nothing is live: no actors, no input map, no rig.
         public void ShowSelect()
         {
+            if (NetworkMode) return;
+            if (ArenaMode) { arenaMenu = !arenaMenu; ((ControlModuleBase)ActiveModule).SetInputEnabled(!arenaMenu); ApplyCursor(arenaMenu ? HubCursorMode.Free : ActiveModule.RequiredCursor); return; }
             if (ActiveModule != null) ((ControlModuleBase)ActiveModule).Deactivate();
             if (OpponentModule != null) ((ControlModuleBase)OpponentModule).Deactivate();
             ActiveModule = null;
@@ -87,18 +91,22 @@ namespace DCG.Bootstrap.Hub
 
         public bool Select(ClassId id)
         {
+            if (NetworkMode) return false;
+            if (ArenaMode) return SwitchCharacter(id);
             var module = Find(id);
             if (module == null) return false;
             Select(module);
             return true;
         }
 
-        public void Select(ControlModuleBase module) { Select(module, null); }
+        public void Select(ControlModuleBase module) { if (NetworkMode) return; if (ArenaMode) SwitchCharacter(module.Id); else Select(module, null); }
 
         // One class against another, in the same space. The opponent is activated first so the driven
         // class can be pointed at an actor that already exists.
         public bool SelectDuel(ClassId controlled, ClassId opponent)
         {
+            if (NetworkMode) return false;
+            if (ArenaMode) return false;
             var driven = Find(controlled);
             var standing = Find(opponent);
             if (driven == null || standing == null || driven == standing) return false;
@@ -136,6 +144,8 @@ namespace DCG.Bootstrap.Hub
 
         public void ResetActive()
         {
+            if (NetworkMode) return;
+            if (ArenaMode) { ResetArena(); return; }
             var opponent = OpponentModule;
             if (opponent == null) { ActiveModule?.ResetState(); return; }
             // A duel resets as a pair: rebuilding one side alone would leave the other pointing at a
@@ -154,11 +164,20 @@ namespace DCG.Bootstrap.Hub
 
         void FixedUpdate()
         {
+            if (NetworkMode) return;
             if (ActiveModule == null) return;
             // Fresh input events for this fight frame, then the world, then whatever a class has to do
             // on its own frame loop. Fighters are skipped by the world step (ISelfSteppedPolicy) and
             // advance inside their own TickFixed, so nothing is stepped twice.
             InputSystem.Update();
+            if (ArenaMode) { ReadHubKeys(); ReadArenaKeys(); }
+            if (ArenaMode)
+            {
+                UpdateArenaEnemies();
+                world.Step(Time.fixedDeltaTime);
+                foreach (var module in modules) module.TickFixed();
+                return;
+            }
             world.Step(Time.fixedDeltaTime);
             OpponentModule?.TickFixed();
             ActiveModule.TickFixed();
@@ -166,18 +185,21 @@ namespace DCG.Bootstrap.Hub
 
         void Update()
         {
+            if (NetworkMode) return;
             // The readers that do their work in Update expect one input update per rendered frame, which
             // manual mode otherwise does not give them.
             InputSystem.Update();
             ReadHubKeys();
-            ActiveModule?.UpdateView(Time.deltaTime);
-            OpponentModule?.UpdateView(Time.deltaTime);
+            if (ArenaMode) ReadArenaKeys();
+            if (ArenaMode) { foreach (var module in modules) module.UpdateView(Time.deltaTime); }
+            else { ActiveModule?.UpdateView(Time.deltaTime); OpponentModule?.UpdateView(Time.deltaTime); }
         }
 
         void LateUpdate()
         {
-            ActiveModule?.LateUpdateView(Time.deltaTime);
-            OpponentModule?.LateUpdateView(Time.deltaTime);
+            if (NetworkMode) return;
+            if (ArenaMode) { foreach (var module in modules) module.LateUpdateView(Time.deltaTime); }
+            else { ActiveModule?.LateUpdateView(Time.deltaTime); OpponentModule?.LateUpdateView(Time.deltaTime); }
         }
 
         // Esc and F5 belong to the hub, not to a class. A module's own input reader may also use Esc
@@ -185,6 +207,7 @@ namespace DCG.Bootstrap.Hub
         // meaning the same in every class: Esc leaves the class, F5 resets the one that is running.
         void ReadHubKeys()
         {
+            if (ArenaMode) return;
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
             if (keyboard.escapeKey.wasPressedThisFrame && ActiveModule != null) ShowSelect();
@@ -193,6 +216,8 @@ namespace DCG.Bootstrap.Hub
 
         void OnGUI()
         {
+            if (NetworkMode) return;
+            if (ArenaMode) { DrawArena(); return; }
             if (Selecting) selectScreen?.Draw(this);
             else hud?.Draw(this);
         }

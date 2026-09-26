@@ -67,6 +67,7 @@ namespace DCG.Core
     [Serializable] public struct ActorSnapshot
     {
         public uint ServerTick, LastProcessedSequence;
+        public uint LastProcessedClientTick, LastProcessedServerTick;
         public ActorId ActorId;
         public Vector3 Position, Velocity;
         public float Facing;

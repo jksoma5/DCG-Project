@@ -2,7 +2,7 @@ using DCG.Core;
 using UnityEngine;
 namespace DCG.Gameplay.Fighting
 {
-    public sealed class FighterAgent : MonoBehaviour,IActorActionPolicy,ISelfSteppedPolicy
+    public sealed partial class FighterAgent : MonoBehaviour,IActorActionPolicy,ISelfSteppedPolicy
     {
         public FightMoveSet moveSet;
         public bool HoldPosition;
@@ -66,7 +66,9 @@ namespace DCG.Gameplay.Fighting
         {
             if(!Accepts(command))return;
             if(command.Envelope.CommandType==CommandType.Stop){Stop();return;}
-            input=command.Fight;lastReceived=Frame;
+            var pressed=input.Pressed|command.Fight.Pressed;
+            var released=input.Released|command.Fight.Released;
+            input=command.Fight;input.Pressed=pressed;input.Released=released;lastReceived=Frame;
         }
         public void Prepare(int frame)
         {
